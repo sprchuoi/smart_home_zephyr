@@ -23,7 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: example-application
+          path: smart_home_zephyr
           persist-credentials: false
 
       - name: Set up Python
@@ -34,14 +34,16 @@ jobs:
       - name: Setup Zephyr project
         uses: zephyrproject-rtos/action-zephyr-setup@v1
         with:
-          app-path: example-application/software
+          app-path: smart_home_zephyr/software
           toolchains: arm-zephyr-eabi:xtensa-espressif_esp32_zephyr-elf
           ccache-cache-key: ${{ matrix.os }}
 
       - name: Build firmware
-        working-directory: example-application
         shell: bash
         run: |
+          # Change to workspace root
+          cd smart_home_zephyr
+          
           # Update west modules for ESP32 HAL
           west update hal_espressif
           
@@ -53,9 +55,9 @@ jobs:
           west build -b esp32_devkitc/esp32/procpu app
 
       - name: Twister Tests
-        working-directory: example-application
         shell: bash
         run: |
+          cd smart_home_zephyr
           if [ "${{ runner.os }}" = "Windows" ]; then
             EXTRA_TWISTER_FLAGS="--short-build-path -O/tmp/twister-out"
           fi
