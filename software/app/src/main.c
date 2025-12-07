@@ -16,6 +16,8 @@ LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 #define BLINK_PERIOD_MS_STEP 100U
 #define BLINK_PERIOD_MS_MAX  1000U
 
+/// Updated for ESP32-WROOM-32 DevKit
+
 int main(void)
 {
 	int ret;
