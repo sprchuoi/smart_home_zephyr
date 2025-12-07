@@ -15,7 +15,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-13, macos-14, windows-2022]
+        os: [ubuntu-22.04]
+        # ESP32 builds require xtensa toolchain, limiting to Linux for simplicity
+        # Add macos-13, macos-14, windows-2022 when cross-platform support is needed
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -33,17 +35,22 @@ jobs:
         uses: zephyrproject-rtos/action-zephyr-setup@v1
         with:
           app-path: example-application
-          toolchains: arm-zephyr-eabi
+          toolchains: arm-zephyr-eabi:xtensa-espressif_esp32_zephyr-elf
           ccache-cache-key: ${{ matrix.os }}
 
       - name: Build firmware
         working-directory: example-application
         shell: bash
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            EXTRA_TWISTER_FLAGS="--short-build-path -O/tmp/twister-out"
-          fi
-          west twister -T app -v --inline-logs --integration $EXTRA_TWISTER_FLAGS
+          # Update west modules for ESP32 HAL
+          west update hal_espressif
+          
+          # Install ESP32 Python dependencies
+          pip3 install "esptool>=5.0.2"
+          
+          # Build for ESP32
+          cd software
+          west build -b esp32_devkitc/esp32/procpu app
 
       - name: Twister Tests
         working-directory: example-application
@@ -52,4 +59,4 @@ jobs:
           if [ "${{ runner.os }}" = "Windows" ]; then
             EXTRA_TWISTER_FLAGS="--short-build-path -O/tmp/twister-out"
           fi
-          west twister -T tests -v --inline-logs --integration $EXTRA_TWISTER_FLAGS
+          west twister -T software/tests -v --inline-logs --integration $EXTRA_TWISTER_FLAGS
