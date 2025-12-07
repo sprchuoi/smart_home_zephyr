@@ -4,77 +4,111 @@
  */
 
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
-
-#include <app/drivers/blink.h>
 
 #include <app_version.h>
 
-LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
+#include "modules/blink/blink_module.h"
+#include "modules/sensor/sensor_module.h"
+#include "modules/ble/ble_module.h"
+#include "modules/wifi/wifi_module.h"
+#include "modules/display/display_module.h"
+#include "modules/button/button_module.h"
 
-#define BLINK_PERIOD_MS_STEP 100U
-#define BLINK_PERIOD_MS_MAX  1000U
+#include "thread/blink_task.h"
+#include "thread/sensor_task.h"
+#include "thread/ble_task.h"
+#include "thread/wifi_task.h"
+#include "thread/display_task.h"
+
+LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 
 /// Updated for ESP32-WROOM-32 DevKit
 
 int main(void)
 {
 	int ret;
-	unsigned int period_ms = BLINK_PERIOD_MS_MAX;
-	const struct device *sensor, *blink;
-	struct sensor_value last_val = { 0 }, val;
 
 	printk("Zephyr Example Application %s\n", APP_VERSION_STRING);
+	printk("ESP32-WROOM-32 with Modular Architecture\n");
 
-	sensor = DEVICE_DT_GET(DT_NODELABEL(example_sensor));
-	if (!device_is_ready(sensor)) {
-		LOG_ERR("Sensor not ready");
-		return 0;
-	}
-
-	blink = DEVICE_DT_GET(DT_NODELABEL(blink_led));
-	if (!device_is_ready(blink)) {
-		LOG_ERR("Blink LED not ready");
-		return 0;
-	}
-
-	ret = blink_off(blink);
+	/* Initialize modules */
+	ret = blink_module_init();
 	if (ret < 0) {
-		LOG_ERR("Could not turn off LED (%d)", ret);
+		LOG_ERR("Failed to initialize blink module (%d)", ret);
 		return 0;
 	}
 
+	ret = sensor_module_init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize sensor module (%d)", ret);
+		return 0;
+	}
+
+	ret = ble_module_init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize BLE module (%d)", ret);
+		return 0;
+	}
+
+	/* Initialize WiFi in AP+STA mode (default) */
+	ret = wifi_module_init(WIFI_MODE_AP_STA);
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize WiFi module (%d)", ret);
+		return 0;
+	}
+
+	ret = display_module_init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize display module (%d)", ret);
+		return 0;
+	}
+
+	ret = button_module_init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize button module (%d)", ret);
+		return 0;
+	}
+
+	LOG_INF("All modules initialized");
 	printk("Use the sensor to change LED blinking period\n");
 
+	/* Start task threads */
+	ret = blink_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start blink task (%d)", ret);
+		return 0;
+	}
+
+	ret = sensor_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start sensor task (%d)", ret);
+		return 0;
+	}
+
+	ret = ble_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start BLE task (%d)", ret);
+		return 0;
+	}
+
+	ret = wifi_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start WiFi task (%d)", ret);
+		return 0;
+	}
+
+	ret = display_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start display task (%d)", ret);
+		return 0;
+	}
+
+	LOG_INF("All tasks started successfully");
+
+	/* Main thread sleeps */
 	while (1) {
-		ret = sensor_sample_fetch(sensor);
-		if (ret < 0) {
-			LOG_ERR("Could not fetch sample (%d)", ret);
-			return 0;
-		}
-
-		ret = sensor_channel_get(sensor, SENSOR_CHAN_PROX, &val);
-		if (ret < 0) {
-			LOG_ERR("Could not get sample (%d)", ret);
-			return 0;
-		}
-
-		if ((last_val.val1 == 0) && (val.val1 == 1)) {
-			if (period_ms == 0U) {
-				period_ms = BLINK_PERIOD_MS_MAX;
-			} else {
-				period_ms -= BLINK_PERIOD_MS_STEP;
-			}
-
-			printk("Proximity detected, setting LED period to %u ms\n",
-			       period_ms);
-			blink_set_period_ms(blink, period_ms);
-		}
-
-		last_val = val;
-
-		k_sleep(K_MSEC(100));
+		k_sleep(K_FOREVER);
 	}
 
 	return 0;
