@@ -7,7 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "blink_task.h"
-#include "../modules/blink/blink_module.h"
+#include "../modules/blink/blinkmodule.hpp"
 
 LOG_MODULE_REGISTER(blink_task, CONFIG_APP_LOG_LEVEL);
 
@@ -22,10 +22,11 @@ static void blink_task_entry(void *arg1, void *arg2, void *arg3)
 	ARG_UNUSED(arg2);
 	ARG_UNUSED(arg3);
 
+	BlinkModule& blink = BlinkModule::getInstance();
 	LOG_INF("Blink task started");
 
 	while (1) {
-		blink_module_tick();
+		blink.tick();
 	}
 }
 

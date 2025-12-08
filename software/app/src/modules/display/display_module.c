@@ -8,7 +8,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/display.h>
 #include <zephyr/display/cfb.h>
-#include "display_module.h"
+#include "displaymodule.h"
 
 LOG_MODULE_REGISTER(display_module, CONFIG_APP_LOG_LEVEL);
 

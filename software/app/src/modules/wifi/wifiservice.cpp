@@ -1,0 +1,201 @@
+/*
+ * Copyright (c) 2025 Sprchuoi
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include "WiFiService.hpp"
+#include <zephyr/net/net_mgmt.h>
+#include <zephyr/net/net_event.h>
+#include <zephyr/logging/log.h>
+#include <string.h>
+
+LOG_MODULE_REGISTER(wifi_service, CONFIG_APP_LOG_LEVEL);
+
+WiFiService& WiFiService::getInstance() {
+    static WiFiService instance;
+    return instance;
+}
+
+WiFiService::WiFiService()
+    : mode_(Mode::AP_STA)
+    , connected_(false)
+    , conn_callback_(nullptr)
+    , scan_callback_(nullptr)
+{
+    k_mutex_init(&mutex_);
+}
+
+int WiFiService::init() {
+    return init(Mode::AP_STA);
+}
+
+int WiFiService::init(Mode mode) {
+    LOG_INF("Initializing WiFi Service (mode: %d)", static_cast<int>(mode));
+    
+    k_mutex_lock(&mutex_, K_FOREVER);
+    mode_ = mode;
+    k_mutex_unlock(&mutex_);
+    
+    net_mgmt_init_event_callback(&wifi_cb_, wifi_mgmt_event_handler,
+                                 NET_EVENT_WIFI_CONNECT_RESULT |
+                                 NET_EVENT_WIFI_DISCONNECT_RESULT);
+    net_mgmt_add_event_callback(&wifi_cb_);
+    
+    running_ = true;
+    LOG_INF("WiFi Service initialized");
+    return 0;
+}
+
+int WiFiService::start() {
+    if (!running_) {
+        return -ENODEV;
+    }
+    
+    if (mode_ == Mode::AP || mode_ == Mode::AP_STA) {
+        return startAP(DEFAULT_SSID, DEFAULT_PASSWORD);
+    }
+    
+    return 0;
+}
+
+int WiFiService::stop() {
+    if (!running_) {
+        return 0;
+    }
+    
+    disconnect();
+    running_ = false;
+    return 0;
+}
+
+int WiFiService::connect(const char* ssid, const char* password) {
+    struct net_if *iface = net_if_get_default();
+    struct wifi_connect_req_params params = {0};
+    
+    if (!iface) {
+        LOG_ERR("No network interface");
+        return -ENODEV;
+    }
+    
+    params.ssid = (uint8_t *)ssid;
+    params.ssid_length = strlen(ssid);
+    params.psk = (uint8_t *)password;
+    params.psk_length = strlen(password);
+    params.channel = WIFI_CHANNEL_ANY;
+    params.security = WIFI_SECURITY_TYPE_PSK;
+    
+    LOG_INF("Connecting to WiFi: %s", ssid);
+    
+    int ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
+    if (ret) {
+        LOG_ERR("WiFi connect failed (%d)", ret);
+        return ret;
+    }
+    
+    return 0;
+}
+
+int WiFiService::startAP(const char* ssid, const char* password) {
+    LOG_INF("Starting WiFi AP: %s", ssid);
+    // AP mode implementation would go here
+    return 0;
+}
+
+int WiFiService::scan(ScanResultCallback callback) {
+    struct net_if *iface = net_if_get_default();
+    
+    if (!iface) {
+        LOG_ERR("No network interface");
+        return -ENODEV;
+    }
+    
+    k_mutex_lock(&mutex_, K_FOREVER);
+    scan_callback_ = callback;
+    k_mutex_unlock(&mutex_);
+    
+    // Register scan result callback
+    net_mgmt_init_event_callback(&wifi_scan_cb_, wifi_scan_result_handler,
+                                 NET_EVENT_WIFI_SCAN_RESULT | NET_EVENT_WIFI_SCAN_DONE);
+    net_mgmt_add_event_callback(&wifi_scan_cb_);
+    
+    LOG_INF("Starting WiFi scan");
+    
+    int ret = net_mgmt(NET_REQUEST_WIFI_SCAN, iface, NULL, 0);
+    if (ret) {
+        LOG_ERR("WiFi scan failed (%d)", ret);
+        net_mgmt_del_event_callback(&wifi_scan_cb_);
+        return ret;
+    }
+    
+    return 0;
+}
+
+int WiFiService::disconnect() {
+    struct net_if *iface = net_if_get_default();
+    
+    if (!iface) {
+        return -ENODEV;
+    }
+    
+    LOG_INF("Disconnecting WiFi");
+    
+    int ret = net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
+    if (ret) {
+        LOG_ERR("WiFi disconnect failed (%d)", ret);
+        return ret;
+    }
+    
+    k_mutex_lock(&mutex_, K_FOREVER);
+    connected_ = false;
+    k_mutex_unlock(&mutex_);
+    
+    return 0;
+}
+
+void WiFiService::wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
+                                         uint32_t mgmt_event, struct net_if *iface) {
+    WiFiService& instance = getInstance();
+    
+    if (mgmt_event == NET_EVENT_WIFI_CONNECT_RESULT) {
+        LOG_INF("WiFi Connected");
+        k_mutex_lock(&instance.mutex_, K_FOREVER);
+        instance.connected_ = true;
+        k_mutex_unlock(&instance.mutex_);
+        if (instance.conn_callback_) {
+            instance.conn_callback_(true);
+        }
+    } else if (mgmt_event == NET_EVENT_WIFI_DISCONNECT_RESULT) {
+        LOG_INF("WiFi Disconnected");
+        k_mutex_lock(&instance.mutex_, K_FOREVER);
+        instance.connected_ = false;
+        k_mutex_unlock(&instance.mutex_);
+        if (instance.conn_callback_) {
+            instance.conn_callback_(false);
+        }
+    }
+}
+
+void WiFiService::wifi_scan_result_handler(struct net_mgmt_event_callback *cb,
+                                          uint32_t mgmt_event, struct net_if *iface) {
+    WiFiService& instance = getInstance();
+    
+    if (mgmt_event == NET_EVENT_WIFI_SCAN_RESULT) {
+#ifdef CONFIG_NET_MGMT_EVENT_INFO
+        const struct wifi_scan_result *entry = 
+            (const struct wifi_scan_result *)cb->info;
+        
+        if (instance.scan_callback_ && entry) {
+            instance.scan_callback_(const_cast<struct wifi_scan_result*>(entry));
+        }
+#else
+        LOG_WRN("NET_MGMT_EVENT_INFO not enabled, cannot retrieve scan results");
+#endif
+    } else if (mgmt_event == NET_EVENT_WIFI_SCAN_DONE) {
+        LOG_INF("WiFi scan completed");
+        net_mgmt_del_event_callback(&instance.wifi_scan_cb_);
+        
+        k_mutex_lock(&instance.mutex_, K_FOREVER);
+        instance.scan_callback_ = nullptr;
+        k_mutex_unlock(&instance.mutex_);
+    }
+}

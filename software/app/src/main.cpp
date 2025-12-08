@@ -5,16 +5,17 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-
 #include <app_version.h>
 
-#include "modules/blink/blink_module.h"
-#include "modules/sensor/sensor_module.h"
-#include "modules/ble/ble_module.h"
-#include "modules/wifi/wifi_module.h"
-#include "modules/display/display_module.h"
-#include "modules/button/button_module.h"
+// C++ Module includes
+#include "modules/blink/blinkmodule.hpp"
+#include "modules/sensor/sensormodule.hpp"
+#include "modules/ble/bleservice.hpp"
+#include "modules/wifi/wifiservice.hpp"
+#include "modules/display/displaymodule.hpp"
+#include "modules/button/buttonmodule.hpp"
 
+// Task headers
 #include "thread/blink_task.h"
 #include "thread/sensor_task.h"
 #include "thread/ble_task.h"
@@ -23,88 +24,20 @@
 
 LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 
-/// Updated for ESP32-WROOM-32 DevKit
+/// ESP32-WROOM-32 with C++ OOP Architecture
 
-int main(void)
+// Forward declarations
+static void Os_Init(void);
+static void Os_Start(void);
+
+extern "C" int main(void)
 {
-	int ret;
-
 	printk("Zephyr Example Application %s\n", APP_VERSION_STRING);
-	printk("ESP32-WROOM-32 with Modular Architecture\n");
+	printk("ESP32-WROOM-32 with C++ OOP Architecture\n");
 
-	/* Initialize modules */
-	ret = blink_module_init();
-	if (ret < 0) {
-		LOG_ERR("Failed to initialize blink module (%d)", ret);
-		return 0;
-	}
-
-	ret = sensor_module_init();
-	if (ret < 0) {
-		LOG_ERR("Failed to initialize sensor module (%d)", ret);
-		return 0;
-	}
-
-	ret = ble_module_init();
-	if (ret < 0) {
-		LOG_ERR("Failed to initialize BLE module (%d)", ret);
-		return 0;
-	}
-
-	/* Initialize WiFi in AP+STA mode (default) */
-	ret = wifi_module_init(WIFI_MODE_AP_STA);
-	if (ret < 0) {
-		LOG_ERR("Failed to initialize WiFi module (%d)", ret);
-		return 0;
-	}
-
-	ret = display_module_init();
-	if (ret < 0) {
-		LOG_ERR("Failed to initialize display module (%d)", ret);
-		return 0;
-	}
-
-	ret = button_module_init();
-	if (ret < 0) {
-		LOG_ERR("Failed to initialize button module (%d)", ret);
-		return 0;
-	}
-
-	LOG_INF("All modules initialized");
-	printk("Use the sensor to change LED blinking period\n");
-
-	/* Start task threads */
-	ret = blink_task_start();
-	if (ret < 0) {
-		LOG_ERR("Failed to start blink task (%d)", ret);
-		return 0;
-	}
-
-	ret = sensor_task_start();
-	if (ret < 0) {
-		LOG_ERR("Failed to start sensor task (%d)", ret);
-		return 0;
-	}
-
-	ret = ble_task_start();
-	if (ret < 0) {
-		LOG_ERR("Failed to start BLE task (%d)", ret);
-		return 0;
-	}
-
-	ret = wifi_task_start();
-	if (ret < 0) {
-		LOG_ERR("Failed to start WiFi task (%d)", ret);
-		return 0;
-	}
-
-	ret = display_task_start();
-	if (ret < 0) {
-		LOG_ERR("Failed to start display task (%d)", ret);
-		return 0;
-	}
-
-	LOG_INF("All tasks started successfully");
+	Os_Init(); // Initialize OS and modules
+	
+	Os_Start(); // Start OS threads
 
 	/* Main thread sleeps */
 	while (1) {
@@ -113,4 +46,91 @@ int main(void)
 
 	return 0;
 }
+
+static void Os_Init(void)
+{
+	int ret;
+	
+	// Zephyr OS initializes itself automatically.
+	// Initialize all modules using C++ singletons
+	ret = BlinkModule::getInstance().init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize blink module (%d)", ret);
+		return;
+	}
+
+	ret = SensorModule::getInstance().init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize sensor module (%d)", ret);
+		return;
+	}
+
+	ret = BleService::getInstance().init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize BLE Service (%d)", ret);
+		return;
+	}
+
+	ret = WiFiService::getInstance().init(WiFiService::Mode::AP_STA);
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize WiFi service (%d)", ret);
+		return;
+	}
+
+	ret = DisplayModule::getInstance().init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize display module (%d)", ret);
+		return;
+	}
+
+	ret = ButtonModule::getInstance().init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize button module (%d)", ret);
+		return;
+	}
+
+	LOG_INF("All modules initialized");
+	printk("Use the sensor to change LED blinking period\n");
+} 
+
+
+static void Os_Start(void)
+{
+	int ret;
+	
+	// Zephyr OS starts its own scheduler automatically.
+	// Start task threads
+	ret = blink_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start blink task (%d)", ret);
+		return;
+	}
+
+	ret = sensor_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start sensor task (%d)", ret);
+		return;
+	}
+
+	ret = ble_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start BLE task (%d)", ret);
+		return;
+	}
+
+	ret = wifi_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start WiFi task (%d)", ret);
+		return;
+	}
+
+	ret = display_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start display task (%d)", ret);
+		return;
+	}
+
+	LOG_INF("All tasks started successfully");
+}
+
 

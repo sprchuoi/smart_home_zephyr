@@ -6,10 +6,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "display_task.h"
-#include "../modules/display/display_module.h"
-#include "../modules/button/button_module.h"
-#include "../modules/wifi/wifi_module.h"
-#include "../modules/ble/ble_module.h"
+#include "../modules/display/displaymodule.hpp"
+#include "../modules/button/buttonmodule.hpp"
+#include "../modules/wifi/wifiservice.hpp"
+#include "../modules/ble/bleservice.hpp"
 
 LOG_MODULE_REGISTER(display_task, CONFIG_APP_LOG_LEVEL);
 

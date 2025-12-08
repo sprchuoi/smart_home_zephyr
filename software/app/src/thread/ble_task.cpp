@@ -7,7 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "ble_task.h"
-#include "../modules/ble/ble_module.h"
+#include "../modules/ble/bleservice.hpp"
 
 LOG_MODULE_REGISTER(ble_task, CONFIG_APP_LOG_LEVEL);
 
@@ -24,11 +24,12 @@ static void ble_task_entry(void *arg1, void *arg2, void *arg3)
 
 	int err;
 	uint32_t count = 0;
+	BleService& ble = BleService::getInstance();
 
 	LOG_INF("BLE task started");
 
 	/* Start advertising */
-	err = ble_module_start_advertising();
+	err = ble.startAdvertising();
 	if (err) {
 		LOG_ERR("Failed to start advertising");
 		return;
@@ -36,11 +37,11 @@ static void ble_task_entry(void *arg1, void *arg2, void *arg3)
 
 	/* Periodically send "Hello World" notifications */
 	while (1) {
-		if (ble_module_is_connected() && ble_module_is_notify_enabled()) {
+		if (ble.isConnected() && ble.isNotifyEnabled()) {
 			char msg[20];
 			snprintf(msg, sizeof(msg), "Hello World %u", count++);
 			
-			err = ble_module_notify((uint8_t *)msg, strlen(msg));
+			err = ble.notify(msg);
 			if (err == 0) {
 				LOG_INF("Sent: %s", msg);
 			}

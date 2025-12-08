@@ -11,6 +11,7 @@
 
 #define BLE_TASK_STACK_SIZE 2048
 #define BLE_TASK_PRIORITY 5
+#define BLE_NOTIFY_INTERVAL_MS 2000U
 
 /**
  * @brief Initialize and start the BLE task thread

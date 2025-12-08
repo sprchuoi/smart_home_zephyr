@@ -31,24 +31,43 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Setup Zephyr project
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: smart_home_zephyr/software
-          toolchains: arm-zephyr-eabi:xtensa-espressif_esp32_zephyr-elf
-          ccache-cache-key: ${{ matrix.os }}
+      - name: Install dependencies
+        shell: bash
+        run: |
+          pip3 install west
+          
+      - name: Setup Zephyr workspace
+        shell: bash
+        run: |
+          # Initialize west workspace
+          cd smart_home_zephyr
+          west init -l software --mf west.yml
+          
+          # Update all modules
+          west update
+          
+          # Install Python dependencies
+          pip3 install -r zephyr/scripts/requirements.txt
+          pip3 install "esptool>=5.0.2"
+          
+      - name: Install Zephyr SDK
+        shell: bash
+        run: |
+          wget -q https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.17.4/zephyr-sdk-0.17.4_linux-x86_64_minimal.tar.xz
+          tar xf zephyr-sdk-0.17.4_linux-x86_64_minimal.tar.xz
+          cd zephyr-sdk-0.17.4
+          ./setup.sh -t xtensa-espressif_esp32_zephyr-elf -t arm-zephyr-eabi -h -c
 
       - name: Build firmware
         shell: bash
         run: |
-          # Change to workspace root
+          # Set Zephyr environment
           cd smart_home_zephyr
+          export ZEPHYR_BASE=$PWD/zephyr
+          export PATH=$HOME/zephyr-sdk-0.17.4/xtensa-espressif_esp32_zephyr-elf/bin:$PATH
           
-          # Update west modules for ESP32 HAL
-          west update hal_espressif
-          
-          # Install ESP32 Python dependencies
-          pip3 install "esptool>=5.0.2"
+          # Fetch ESP32 HAL blobs
+          west blobs fetch hal_espressif
           
           # Build for ESP32
           cd software
@@ -58,6 +77,7 @@ jobs:
         shell: bash
         run: |
           cd smart_home_zephyr
+          export ZEPHYR_BASE=$PWD/zephyr
           if [ "${{ runner.os }}" = "Windows" ]; then
             EXTRA_TWISTER_FLAGS="--short-build-path -O/tmp/twister-out"
           fi
