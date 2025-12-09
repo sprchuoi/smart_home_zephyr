@@ -132,14 +132,12 @@ static void Os_Start(void)
 		return;
 	}
 
-	// Start UART task (interrupt-driven with message queue)
-	k_thread_create(&uart_task_thread, uart_task_stack,
-			K_THREAD_STACK_SIZEOF(uart_task_stack),
-			uart_task_entry,
-			NULL, NULL, NULL,
-			UART_TASK_PRIORITY, 0, K_NO_WAIT);
-	k_thread_name_set(&uart_task_thread, "uart_task");
-	LOG_INF("UART task started");
+	ret = uart_task_start();
+	if (ret < 0) {
+		LOG_ERR("Failed to start UART task (%d)", ret);
+		return;
+	}
+	
 
 	LOG_INF("All tasks started successfully");
 }

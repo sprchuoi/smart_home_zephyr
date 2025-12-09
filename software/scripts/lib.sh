@@ -239,6 +239,67 @@ edit_config() {
     print_info "Rebuild to apply: ./make.sh build"
 }
 
+# Build documentation
+build_docs() {
+    local doc_dir="$SCRIPT_DIR/doc"
+    local build_dir="$doc_dir/_build"
+    
+    if [ ! -d "$doc_dir" ]; then
+        print_error "Documentation directory not found: $doc_dir"
+        return 1
+    fi
+    
+    # Check if Sphinx is installed
+    if ! command_exists sphinx-build; then
+        print_warning "Sphinx not found. Installing requirements..."
+        
+        if [ -f "$doc_dir/requirements.txt" ]; then
+            pip3 install --user -r "$doc_dir/requirements.txt" || {
+                print_error "Failed to install documentation requirements"
+                print_info "Install manually: pip3 install -r doc/requirements.txt"
+                return 1
+            }
+        else
+            print_error "requirements.txt not found in doc/"
+            print_info "Install Sphinx: pip3 install sphinx sphinx-rtd-theme"
+            return 1
+        fi
+    fi
+    
+    # Clean previous build
+    if [ -d "$build_dir" ]; then
+        print_info "Cleaning previous build..."
+        rm -rf "$build_dir"
+    fi
+    
+    # Build documentation
+    print_info "Building HTML documentation..."
+    cd "$doc_dir"
+    
+    if make html; then
+        print_success "Documentation built successfully"
+        print_info "Output: $build_dir/html/index.html"
+        
+        # Try to open in browser
+        if command_exists xdg-open; then
+            print_info "Opening in browser..."
+            xdg-open "$build_dir/html/index.html" 2>/dev/null &
+        elif command_exists open; then
+            print_info "Opening in browser..."
+            open "$build_dir/html/index.html" 2>/dev/null &
+        else
+            echo ""
+            print_info "View documentation:"
+            echo "  file://$build_dir/html/index.html"
+        fi
+    else
+        print_error "Documentation build failed"
+        return 1
+    fi
+    
+    cd - > /dev/null
+}
+
 # Export functions
 export -f print_header
 export -f print_success
@@ -253,3 +314,4 @@ export -f detect_serial_port
 export -f flash_firmware
 export -f open_monitor
 export -f edit_config
+export -f build_docs

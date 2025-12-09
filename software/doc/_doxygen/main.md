@@ -1,5 +1,5 @@
 # Introduction
 
-This is the Doxygen documentation for [example-application].
+This is the Doxygen documentation for [smart-home-application].
 
-[example-application]: https://github.com/zephyrproject-rtos/example-application
+[smart-home-application]: https://github.com/sprchuoi/smart_home_zephyr

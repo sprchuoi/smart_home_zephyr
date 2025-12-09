@@ -89,3 +89,17 @@ void uart_task_entry(void *p1, void *p2, void *p3) {
         }
     }
 }
+
+
+int uart_task_start(void)
+{
+	// Start UART task (interrupt-driven with message queue)
+	k_thread_create(&uart_task_thread, uart_task_stack,
+			K_THREAD_STACK_SIZEOF(uart_task_stack),
+			uart_task_entry,
+			NULL, NULL, NULL,
+			UART_TASK_PRIORITY, 0, K_NO_WAIT);
+	k_thread_name_set(&uart_task_thread, "uart_task");
+	LOG_INF("UART task started");
+	return 0;
+}

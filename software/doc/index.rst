@@ -1,5 +1,5 @@
 Welcome to Smart Home Application's documentation!
-===============================================
+=======================================================
 
 This is a simple Sphinx documentation setup for ``smart-home-application``.
 

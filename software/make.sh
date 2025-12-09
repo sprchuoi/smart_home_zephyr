@@ -31,6 +31,7 @@ show_usage() {
     echo -e "  ${YELLOW}flash${NC}      Flash firmware to ESP32"
     echo -e "  ${YELLOW}monitor${NC}    Open serial monitor"
     echo -e "  ${YELLOW}all${NC}        Build and flash"
+    echo -e "  ${YELLOW}docs${NC}       Build documentation (Sphinx)"
     echo -e "  ${YELLOW}config${NC}     Edit WiFi configuration"
     echo -e "  ${YELLOW}help${NC}       Show this help message"
     echo ""
@@ -43,6 +44,7 @@ show_usage() {
     echo "  ./make.sh build              # Build firmware"
     echo "  ./make.sh flash              # Flash to ESP32"
     echo "  ./make.sh all                # Build and flash"
+    echo "  ./make.sh docs               # Build documentation"
     echo "  ./make.sh monitor            # Monitor serial output"
     echo "  ./make.sh build --board esp32_devkitc_wroom"
     echo ""
@@ -115,6 +117,11 @@ case $COMMAND in
     config)
         print_header "Edit Configuration"
         edit_config
+        ;;
+    
+    docs)
+        print_header "Building Documentation"
+        build_docs
         ;;
     
     help|--help|-h)

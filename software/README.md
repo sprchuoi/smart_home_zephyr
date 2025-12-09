@@ -106,7 +106,7 @@ west twister -T tests --integration
 
 ### Documentation
 
-A minimal documentation setup is provided for Doxygen and Sphinx. To build the
+A minimal documentation setup is provided for Doxygen and Sphinx. To buil d the
 documentation first change to the ``doc`` folder:
 
 ```shell
