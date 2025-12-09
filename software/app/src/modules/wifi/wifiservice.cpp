@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "WiFiService.hpp"
+#include "wifiservice.hpp"
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/net_event.h>
 #include <zephyr/logging/log.h>
@@ -69,6 +69,7 @@ int WiFiService::stop() {
 }
 
 int WiFiService::connect(const char* ssid, const char* password) {
+#ifdef CONFIG_WIFI
     struct net_if *iface = net_if_get_default();
     struct wifi_connect_req_params params = {0};
     
@@ -93,6 +94,10 @@ int WiFiService::connect(const char* ssid, const char* password) {
     }
     
     return 0;
+#else
+    LOG_WRN("WiFi not enabled in configuration");
+    return -ENOTSUP;
+#endif
 }
 
 int WiFiService::startAP(const char* ssid, const char* password) {
@@ -102,6 +107,7 @@ int WiFiService::startAP(const char* ssid, const char* password) {
 }
 
 int WiFiService::scan(ScanResultCallback callback) {
+#ifdef CONFIG_WIFI
     struct net_if *iface = net_if_get_default();
     
     if (!iface) {
@@ -128,9 +134,14 @@ int WiFiService::scan(ScanResultCallback callback) {
     }
     
     return 0;
+#else
+    LOG_WRN("WiFi not enabled in configuration");
+    return -ENOTSUP;
+#endif
 }
 
 int WiFiService::disconnect() {
+#ifdef CONFIG_WIFI
     struct net_if *iface = net_if_get_default();
     
     if (!iface) {
@@ -150,6 +161,10 @@ int WiFiService::disconnect() {
     k_mutex_unlock(&mutex_);
     
     return 0;
+#else
+    LOG_WRN("WiFi not enabled in configuration");
+    return -ENOTSUP;
+#endif
 }
 
 void WiFiService::wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,

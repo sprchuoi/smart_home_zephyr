@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "BleService.hpp"
+#include "bleservice.hpp"
 #include <zephyr/logging/log.h>
 #include <string.h>
 

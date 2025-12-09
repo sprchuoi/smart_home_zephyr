@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "ButtonModule.hpp"
+#include "buttonmodule.hpp"
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(button_module_cpp, CONFIG_APP_LOG_LEVEL);

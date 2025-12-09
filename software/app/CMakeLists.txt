@@ -15,6 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 target_sources(app PRIVATE 
     src/main.cpp
+    src/cpp_support.cpp
     # C++ OOP Modules
     src/modules/blink/blinkmodule.cpp
     src/modules/sensor/sensormodule.cpp
@@ -30,4 +31,10 @@ target_sources(app PRIVATE
     src/thread/display_task.cpp
 )
 
-target_include_directories(app PRIVATE src)
+target_include_directories(app PRIVATE 
+    src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+# Link C++ standard library and support libraries
+target_link_libraries(app PRIVATE stdc++ gcc)

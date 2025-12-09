@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "DisplayModule.hpp"
+#include "displaymodule.hpp"
 #include <zephyr/device.h>
 #include <zephyr/drivers/display.h>
 #include <zephyr/display/cfb.h>

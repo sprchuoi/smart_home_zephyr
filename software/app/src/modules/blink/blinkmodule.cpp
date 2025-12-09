@@ -3,14 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "BlinkModule.hpp"
-#include <app/drivers/blink.h>
+#include "blinkmodule.hpp"
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(blink_module_cpp, CONFIG_APP_LOG_LEVEL);
 
-#if DT_NODE_EXISTS(DT_NODELABEL(blink_led))
-#define BLINK_DEV DEVICE_DT_GET(DT_NODELABEL(blink_led))
+// Define the LED GPIO spec from device tree
+#if DT_NODE_EXISTS(DT_ALIAS(led0))
+#define LED0_NODE DT_ALIAS(led0)
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 #endif
 
 BlinkModule& BlinkModule::getInstance() {
@@ -23,18 +25,22 @@ BlinkModule::BlinkModule() : period_ms_(DEFAULT_PERIOD_MS) {
 }
 
 int BlinkModule::init() {
-#if DT_NODE_EXISTS(DT_NODELABEL(blink_led))
-    const struct device *blink_dev = BLINK_DEV;
-    
-    if (!device_is_ready(blink_dev)) {
-        LOG_ERR("Blink device not ready");
+#if DT_NODE_EXISTS(DT_ALIAS(led0))
+    if (!gpio_is_ready_dt(&led)) {
+        LOG_ERR("LED GPIO device not ready");
         return -ENODEV;
+    }
+    
+    int ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+    if (ret < 0) {
+        LOG_ERR("Failed to configure LED GPIO (%d)", ret);
+        return ret;
     }
     
     LOG_INF("Blink module initialized (period: %u ms)", period_ms_);
     return 0;
 #else
-    LOG_WRN("Blink LED not configured in device tree");
+    LOG_WRN("LED not configured in device tree");
     return -ENOTSUP;
 #endif
 }
@@ -47,13 +53,21 @@ void BlinkModule::setPeriod(uint32_t period_ms) {
 }
 
 void BlinkModule::tick() {
-#if DT_NODE_EXISTS(DT_NODELABEL(blink_led))
-    const struct device *blink_dev = BLINK_DEV;
+#if DT_NODE_EXISTS(DT_ALIAS(led0))
+    static bool led_state = false;
     
-    if (device_is_ready(blink_dev)) {
-        blink_led_on(blink_dev);
-        k_sleep(K_MSEC(50));
-        blink_led_off(blink_dev);
-    }
+    k_mutex_lock(&mutex_, K_FOREVER);
+    
+    // Toggle LED
+    led_state = !led_state;
+    gpio_pin_set_dt(&led, led_state ? 1 : 0);
+    
+    k_mutex_unlock(&mutex_);
+    
+    // Sleep for the configured period
+    k_sleep(K_MSEC(period_ms_));
+#else
+    // If no LED, just sleep
+    k_sleep(K_MSEC(period_ms_));
 #endif
 }
