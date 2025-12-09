@@ -8,8 +8,12 @@
 #include "display_task.h"
 #include "../modules/display/displaymodule.hpp"
 #include "../modules/button/buttonmodule.hpp"
+#if defined(CONFIG_WIFI)
 #include "../modules/wifi/wifiservice.hpp"
+#endif
+#if defined(CONFIG_BT)
 #include "../modules/ble/bleservice.hpp"
+#endif
 
 LOG_MODULE_REGISTER(display_task, CONFIG_APP_LOG_LEVEL);
 
@@ -52,6 +56,7 @@ static void display_task_entry(void *arg1, void *arg2, void *arg3)
 
 	/* Main display update loop */
 	while (1) {
+#if defined(CONFIG_WIFI)
 		/* Get WiFi status */
 		if (WiFiService::getInstance().isConnected()) {
 			strcpy(wifi_status_str, "Connected");
@@ -61,13 +66,21 @@ static void display_task_entry(void *arg1, void *arg2, void *arg3)
 			strcpy(wifi_status_str, "Disconnected");
 			ip_str[0] = '\0';
 		}
+#else
+		strcpy(wifi_status_str, "N/A");
+		ip_str[0] = '\0';
+#endif
 
+#if defined(CONFIG_BT)
 		/* Get BLE status */
 		if (BleService::getInstance().isConnected()) {
 			strcpy(ble_status_str, "Connected");
 		} else {
 			strcpy(ble_status_str, "Advertising");
 		}
+#else
+		strcpy(ble_status_str, "N/A");
+#endif
 
 		/* Update display with status */
 		DisplayModule::getInstance().updateStatus(wifi_status_str, ble_status_str, ip_str);

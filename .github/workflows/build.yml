@@ -82,3 +82,86 @@ jobs:
             EXTRA_TWISTER_FLAGS="--short-build-path -O/tmp/twister-out"
           fi
           west twister -T software/tests -v --inline-logs --integration $EXTRA_TWISTER_FLAGS
+
+  qemu-smoke-test:
+    name: QEMU Smoke Test
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: smart_home_zephyr
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          pip3 install west
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-arm
+          
+      - name: Setup Zephyr workspace
+        shell: bash
+        run: |
+          cd smart_home_zephyr
+          west init -l software --mf west.yml
+          west update
+          pip3 install -r zephyr/scripts/requirements.txt
+          
+      - name: Install Zephyr SDK
+        shell: bash
+        run: |
+          wget -q https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.17.4/zephyr-sdk-0.17.4_linux-x86_64_minimal.tar.xz
+          tar xf zephyr-sdk-0.17.4_linux-x86_64_minimal.tar.xz
+          cd zephyr-sdk-0.17.4
+          ./setup.sh -t arm-zephyr-eabi -h -c
+
+      - name: Build for QEMU (ARM Cortex-M3)
+        shell: bash
+        run: |
+          cd smart_home_zephyr/software
+          export ZEPHYR_BASE=$PWD/../zephyr
+          
+          # Build a minimal configuration for QEMU Cortex-M3
+          west build -b qemu_cortex_m3 app -p -- \
+            -DCONFIG_BT=n \
+            -DCONFIG_WIFI=n \
+            -DCONFIG_NETWORKING=n \
+            -DCONFIG_DISPLAY=n \
+            -DCONFIG_I2C=n
+
+      - name: Run QEMU smoke test
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          cd smart_home_zephyr/software
+          
+          # Run in QEMU with timeout
+          timeout 30s west build -t run || EXIT_CODE=$?
+          
+          # Check if timeout (exit code 124) or clean exit
+          if [ ${EXIT_CODE:-0} -eq 124 ]; then
+            echo "QEMU test timed out as expected (application running)"
+            exit 0
+          elif [ ${EXIT_CODE:-0} -eq 0 ]; then
+            echo "QEMU test completed successfully"
+            exit 0
+          else
+            echo "QEMU test failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+      - name: Archive QEMU build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-smoke-test-build
+          path: |
+            smart_home_zephyr/software/build/zephyr/zephyr.elf
+            smart_home_zephyr/software/build/zephyr/zephyr.map
+            smart_home_zephyr/software/build/zephyr/.config

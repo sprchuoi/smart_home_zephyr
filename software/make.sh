@@ -31,6 +31,7 @@ show_usage() {
     echo -e "  ${YELLOW}flash${NC}      Flash firmware to ESP32"
     echo -e "  ${YELLOW}monitor${NC}    Open serial monitor"
     echo -e "  ${YELLOW}all${NC}        Build and flash"
+    echo -e "  ${YELLOW}qemu${NC}       Build and run in QEMU (smoke test)"
     echo -e "  ${YELLOW}docs${NC}       Build documentation (Sphinx)"
     echo -e "  ${YELLOW}config${NC}     Edit WiFi configuration"
     echo -e "  ${YELLOW}help${NC}       Show this help message"
@@ -44,9 +45,10 @@ show_usage() {
     echo "  ./make.sh build              # Build firmware"
     echo "  ./make.sh flash              # Flash to ESP32"
     echo "  ./make.sh all                # Build and flash"
+    echo "  ./make.sh qemu               # Run smoke test in QEMU"
     echo "  ./make.sh docs               # Build documentation"
     echo "  ./make.sh monitor            # Monitor serial output"
-    echo "  ./make.sh build --board esp32_devkitc_wroom"
+    echo "  ./make.sh build --board esp32_devkitc"
     echo ""
 }
 
@@ -112,6 +114,12 @@ case $COMMAND in
         flash_firmware "$PORT"
         echo ""
         echo -e "${GREEN}Done! Run './make.sh monitor' to see output${NC}"
+        ;;
+    
+    qemu)
+        print_header "QEMU Smoke Test"
+        check_environment
+        run_qemu_test
         ;;
     
     config)

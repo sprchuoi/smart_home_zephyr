@@ -4,8 +4,12 @@
  */
 
 #include "menu_manager.hpp"
+#if defined(CONFIG_WIFI)
 #include "../modules/wifi/wifiservice.hpp"
+#endif
+#if defined(CONFIG_BT)
 #include "../modules/ble/bleservice.hpp"
+#endif
 #include "../modules/display/displaymodule.hpp"
 #include <zephyr/logging/log.h>
 
@@ -13,6 +17,7 @@ LOG_MODULE_REGISTER(menu_manager, CONFIG_APP_LOG_LEVEL);
 
 /* Callback functions for menu actions */
 
+#if defined(CONFIG_WIFI)
 /* WiFi menu actions */
 static void wifi_connect_action() {
     LOG_INF("WiFi Connect selected");
@@ -48,6 +53,13 @@ static void wifi_ap_stop_action() {
     WiFiService::getInstance().stopAP();
 }
 
+/* Value getters for status display */
+static const char* wifi_status_getter() {
+    return WiFiService::getInstance().isConnected() ? "Connected" : "Disconnected";
+}
+#endif /* CONFIG_WIFI */
+
+#if defined(CONFIG_BT)
 /* BLE menu actions */
 static void ble_start_adv_action() {
     LOG_INF("BLE Start Advertising selected");
@@ -58,6 +70,11 @@ static void ble_stop_adv_action() {
     LOG_INF("BLE Stop Advertising selected");
     BleService::getInstance().stopAdvertising();
 }
+
+static const char* ble_status_getter() {
+    return BleService::getInstance().isConnected() ? "Connected" : "Idle";
+}
+#endif /* CONFIG_BT */
 
 /* Display menu actions */
 static void display_wake_action() {
@@ -81,15 +98,7 @@ static void system_reset_action() {
     // Implement system reset
 }
 
-/* Value getters for status display */
-static const char* wifi_status_getter() {
-    return WiFiService::getInstance().isConnected() ? "Connected" : "Disconnected";
-}
-
-static const char* ble_status_getter() {
-    return BleService::getInstance().isConnected() ? "Connected" : "Idle";
-}
-
+/* Display status getter */
 static const char* display_status_getter() {
     return DisplayModule::getInstance().isSleeping() ? "Sleeping" : "Active";
 }
@@ -203,6 +212,7 @@ void MenuManager::createServicesMenu()
     
     MenuSystem& menu_sys = MenuSystem::getInstance();
     
+#if defined(CONFIG_WIFI)
     // Create WiFi submenu
     MenuItem* wifi_menu = menu_sys.createMenuItem("WiFi", MenuItemType::SUBMENU);
     menu_sys.addMenuItem(services_menu_, wifi_menu);
@@ -244,7 +254,9 @@ void MenuManager::createServicesMenu()
             menu_sys.addMenuItem(wifi_menu, wifi_back);
         }
     }
+#endif /* CONFIG_WIFI */
     
+#if defined(CONFIG_BT)
     // Create BLE submenu
     MenuItem* ble_menu = menu_sys.createMenuItem("BLE", MenuItemType::SUBMENU);
     menu_sys.addMenuItem(services_menu_, ble_menu);
@@ -271,6 +283,7 @@ void MenuManager::createServicesMenu()
             menu_sys.addMenuItem(ble_menu, ble_back);
         }
     }
+#endif /* CONFIG_BT */
     
     // Back to main menu
     MenuItem* services_back = menu_sys.createMenuItem("< Back", MenuItemType::BACK);

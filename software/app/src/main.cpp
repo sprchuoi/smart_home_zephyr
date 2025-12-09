@@ -10,8 +10,12 @@
 // C++ Module includes
 #include "modules/blink/blinkmodule.hpp"
 #include "modules/sensor/sensormodule.hpp"
+#if defined(CONFIG_BT)
 #include "modules/ble/bleservice.hpp"
+#endif
+#if defined(CONFIG_WIFI)
 #include "modules/wifi/wifiservice.hpp"
+#endif
 #include "modules/display/displaymodule.hpp"
 #include "modules/button/buttonmodule.hpp"
 #include "modules/uart/uartmodule.hpp"
@@ -23,8 +27,12 @@
 // Task headers
 #include "thread/blink_task.h"
 #include "thread/sensor_task.h"
+#if defined(CONFIG_BT)
 #include "thread/ble_task.h"
+#endif
+#if defined(CONFIG_WIFI)
 #include "thread/wifi_task.h"
+#endif
 #include "thread/display_task.h"
 #include "thread/uart_task.h"
 
@@ -78,17 +86,21 @@ static void Os_Init(void)
 		return;
 	}
 
+#if defined(CONFIG_BT)
 	ret = BleService::getInstance().init();
 	if (ret < 0) {
 		LOG_ERR("Failed to initialize BLE Service (%d)", ret);
 		return;
 	}
+#endif
 
+#if defined(CONFIG_WIFI)
 	ret = WiFiService::getInstance().init(WiFiService::Mode::AP_STA);
 	if (ret < 0) {
 		LOG_ERR("Failed to initialize WiFi service (%d)", ret);
 		return;
 	}
+#endif
 
 	ret = DisplayModule::getInstance().init();
 	if (ret < 0) {
@@ -135,17 +147,21 @@ static void Os_Start(void)
 		return;
 	}
 
+#if defined(CONFIG_BT)
 	ret = ble_task_start();
 	if (ret < 0) {
 		LOG_ERR("Failed to start BLE task (%d)", ret);
 		return;
 	}
+#endif
 
+#if defined(CONFIG_WIFI)
 	ret = wifi_task_start();
 	if (ret < 0) {
 		LOG_ERR("Failed to start WiFi task (%d)", ret);
 		return;
 	}
+#endif
 
 	ret = display_task_start();
 	if (ret < 0) {

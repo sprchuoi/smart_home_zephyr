@@ -300,6 +300,56 @@ build_docs() {
     cd - > /dev/null
 }
 
+# Run QEMU smoke test
+run_qemu_test() {
+    local qemu_board="qemu_cortex_m3"
+    local timeout_sec=30
+    
+    print_info "Building for QEMU (ARM Cortex-M3)..."
+    
+    # Check if QEMU is installed
+    if ! command_exists qemu-system-arm; then
+        print_warning "QEMU ARM not found"
+        print_info "Install: sudo apt-get install qemu-system-arm (Ubuntu/Debian)"
+        print_info "         brew install qemu (macOS)"
+        return 1
+    fi
+    
+    # Build with minimal configuration for QEMU
+    print_info "Building minimal configuration..."
+    west build -b "$qemu_board" app -p -- \
+        -DCONFIG_BT=n \
+        -DCONFIG_WIFI=n \
+        -DCONFIG_NETWORKING=n \
+        -DCONFIG_DISPLAY=n \
+        -DCONFIG_I2C=n || {
+        print_error "QEMU build failed"
+        return 1
+    }
+    
+    print_success "Build successful"
+    print_info "Running in QEMU (${timeout_sec}s timeout)..."
+    echo ""
+    
+    # Run in QEMU with timeout
+    timeout "${timeout_sec}s" west build -t run || EXIT_CODE=$?
+    
+    echo ""
+    
+    # Check exit code
+    if [ ${EXIT_CODE:-0} -eq 124 ]; then
+        print_success "QEMU smoke test passed (timeout = application running)"
+    elif [ ${EXIT_CODE:-0} -eq 0 ]; then
+        print_success "QEMU smoke test passed (clean exit)"
+    else
+        print_error "QEMU smoke test failed (exit code: $EXIT_CODE)"
+        return $EXIT_CODE
+    fi
+    
+    print_info "Build artifacts: build/zephyr/zephyr.elf"
+    return 0
+}
+
 # Export functions
 export -f print_header
 export -f print_success
@@ -315,3 +365,4 @@ export -f flash_firmware
 export -f open_monitor
 export -f edit_config
 export -f build_docs
+export -f run_qemu_test

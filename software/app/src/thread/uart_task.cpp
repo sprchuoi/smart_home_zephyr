@@ -6,7 +6,9 @@
 
 #include "uart_task.h"
 #include "modules/uart/uartmodule.hpp"
+#if defined(CONFIG_BT)
 #include "modules/ble/bleservice.hpp"
+#endif
 #include <zephyr/logging/log.h>
 #include <string.h>
 
@@ -28,6 +30,7 @@ static size_t ble_tx_len = 0;
 static struct k_timer ble_tx_timer;
 
 static void ble_tx_timer_handler(struct k_timer *timer) {
+#if defined(CONFIG_BT)
     // Send accumulated data to BLE if any
     if (ble_tx_len > 0) {
         BleService& ble = BleService::getInstance();
@@ -41,6 +44,7 @@ static void ble_tx_timer_handler(struct k_timer *timer) {
         
         ble_tx_len = 0;  // Reset buffer
     }
+#endif
 }
 
 void uart_task_entry(void *p1, void *p2, void *p3) {
@@ -67,6 +71,7 @@ void uart_task_entry(void *p1, void *p2, void *p3) {
             // Echo received character to UART
             uart.send(&msg.data, 1);
             
+#if defined(CONFIG_BT)
             // Add to BLE transmission buffer
             if (ble_tx_len < BLE_TX_BUFFER_SIZE) {
                 ble_tx_buffer[ble_tx_len++] = msg.data;
@@ -86,6 +91,7 @@ void uart_task_entry(void *p1, void *p2, void *p3) {
                     ble_tx_len = 0;
                 }
             }
+#endif
         }
     }
 }

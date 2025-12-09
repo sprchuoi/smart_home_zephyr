@@ -28,19 +28,31 @@ target_sources(app PRIVATE
     # C++ OOP Modules
     src/modules/blink/blinkmodule.cpp
     src/modules/sensor/sensormodule.cpp
-    src/modules/ble/bleservice.cpp
-    src/modules/wifi/wifiservice.cpp
     src/modules/display/displaymodule.cpp
     src/modules/button/buttonmodule.cpp
     src/modules/uart/uartmodule.cpp
     # Threads (C++ task orchestration)
     src/thread/blink_task.cpp
     src/thread/sensor_task.cpp
-    src/thread/ble_task.cpp
-    src/thread/wifi_task.cpp
     src/thread/display_task.cpp
     src/thread/uart_task.cpp
 )
+
+# Conditionally compile BLE module
+if(CONFIG_BT)
+    target_sources(app PRIVATE
+        src/modules/ble/bleservice.cpp
+        src/thread/ble_task.cpp
+    )
+endif()
+
+# Conditionally compile WiFi module
+if(CONFIG_WIFI)
+    target_sources(app PRIVATE
+        src/modules/wifi/wifiservice.cpp
+        src/thread/wifi_task.cpp
+    )
+endif()
 
 target_include_directories(app PRIVATE 
     src
