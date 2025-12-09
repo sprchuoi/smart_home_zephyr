@@ -37,26 +37,6 @@ void __cxa_guard_abort(__guard_t *g) {
     k_mutex_unlock(&guard_mutex);
 }
 
-// Pure virtual function called handler
-void __cxa_pure_virtual() {
-    printk("ERROR: Pure virtual function called!\n");
-    k_panic();
-}
-
-// Operator delete - singleton destructors shouldn't be called in embedded
-void operator delete(void *ptr) {
-    // In embedded systems, we typically don't delete singletons
-    // This is a no-op to satisfy the linker
-}
-
-void operator delete(void *ptr, unsigned int size) {
-    // No-op
-}
-
-void operator delete(void *ptr, unsigned long size) {
-    // No-op
-}
-
 } // extern "C"
 
 // std::function exception stubs

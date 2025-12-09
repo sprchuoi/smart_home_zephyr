@@ -11,7 +11,6 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
-#include <functional>
 
 /**
  * @brief BLE Service class
@@ -37,8 +36,8 @@ public:
         0x34, 0x12, 0x78, 0x56, 0x34, 0x12, 0x78, 0x56
     };
     
-    using ConnectionCallback = std::function<void(bool connected)>;
-    using DataReceivedCallback = std::function<void(const uint8_t* data, uint16_t len)>;
+    using ConnectionCallback = void (*)(bool connected);
+    using DataReceivedCallback = void (*)(const uint8_t* data, uint16_t len);
     
     /**
      * @brief Get singleton instance

@@ -16,6 +16,25 @@ LOG_MODULE_REGISTER(sensor_task, CONFIG_APP_LOG_LEVEL);
 K_THREAD_STACK_DEFINE(sensor_task_stack, SENSOR_TASK_STACK_SIZE);
 static struct k_thread sensor_task_data;
 
+/* Sensor callback function */
+static void sensor_callback(int value)
+{
+	if (value > 0) {
+		BlinkModule& blink = BlinkModule::getInstance();
+		uint32_t current_period = blink.getPeriod();
+		uint32_t new_period;
+		
+		if (current_period == 0U) {
+			new_period = SENSOR_PERIOD_MS_MAX;
+		} else {
+			new_period = current_period - SENSOR_PERIOD_STEP_MS;
+		}
+		
+		blink.setPeriod(new_period);
+		printk("Proximity detected, setting LED period to %u ms\n", new_period);
+	}
+}
+
 /* Sensor task thread entry */
 static void sensor_task_entry(void *arg1, void *arg2, void *arg3)
 {
@@ -24,26 +43,11 @@ static void sensor_task_entry(void *arg1, void *arg2, void *arg3)
 	ARG_UNUSED(arg3);
 
 	SensorModule& sensor = SensorModule::getInstance();
-	BlinkModule& blink = BlinkModule::getInstance();
 	
 	LOG_INF("Sensor task started");
 
 	/* Set sensor callback for proximity detection */
-	sensor.setCallback([&blink](int value) {
-		if (value > 0) {
-			uint32_t current_period = blink.getPeriod();
-			uint32_t new_period;
-			
-			if (current_period == 0U) {
-				new_period = SENSOR_PERIOD_MS_MAX;
-			} else {
-				new_period = current_period - SENSOR_PERIOD_STEP_MS;
-			}
-			
-			blink.setPeriod(new_period);
-			printk("Proximity detected, setting LED period to %u ms\n", new_period);
-		}
-	});
+	sensor.setCallback(sensor_callback);
 
 	while (1) {
 		sensor.read();

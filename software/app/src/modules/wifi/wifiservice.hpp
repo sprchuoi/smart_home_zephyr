@@ -8,7 +8,6 @@
 
 #include "core/Service.hpp"
 #include <zephyr/net/wifi_mgmt.h>
-#include <functional>
 
 class WiFiService : public Service {
 public:
@@ -18,8 +17,8 @@ public:
         AP_STA
     };
     
-    using ConnectionCallback = std::function<void(bool connected)>;
-    using ScanResultCallback = std::function<void(struct wifi_scan_result *entry)>;
+    using ConnectionCallback = void (*)(bool connected);
+    using ScanResultCallback = void (*)(struct wifi_scan_result *entry);
     
     static constexpr const char* DEFAULT_SSID = "ESP32_SmartHome_AP";
     static constexpr const char* DEFAULT_PASSWORD = "12345678";

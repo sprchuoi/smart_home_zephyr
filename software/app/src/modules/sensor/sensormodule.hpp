@@ -7,12 +7,11 @@
 #define SENSOR_MODULE_HPP
 
 #include "core/Module.hpp"
-#include <zephyr/kernel.h>
-#include <functional>
+#include <zephyr/drivers/sensor.h>
 
 class SensorModule : public Module {
 public:
-    using SensorCallback = std::function<void(int value)>;
+    using SensorCallback = void (*)(int value);
     
     static constexpr uint32_t DEFAULT_SAMPLE_PERIOD_MS = 1000;
     

@@ -8,11 +8,10 @@
 
 #include "core/Module.hpp"
 #include <zephyr/drivers/gpio.h>
-#include <functional>
 
 class ButtonModule : public Module {
 public:
-    using ButtonCallback = std::function<void()>;
+    using ButtonCallback = void (*)();
     
     static ButtonModule& getInstance();
     

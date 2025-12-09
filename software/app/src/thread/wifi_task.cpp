@@ -14,6 +14,16 @@ LOG_MODULE_REGISTER(wifi_task, CONFIG_APP_LOG_LEVEL);
 K_THREAD_STACK_DEFINE(wifi_task_stack, WIFI_TASK_STACK_SIZE);
 static struct k_thread wifi_task_data;
 
+/* WiFi connection callback */
+static void wifi_connection_callback(bool connected)
+{
+	if (connected) {
+		LOG_INF("WiFi connected!");
+	} else {
+		LOG_WRN("WiFi disconnected");
+	}
+}
+
 /* WiFi task thread entry */
 static void wifi_task_entry(void *arg1, void *arg2, void *arg3)
 {
@@ -27,13 +37,7 @@ static void wifi_task_entry(void *arg1, void *arg2, void *arg3)
 	WiFiService& wifi = WiFiService::getInstance();
 
 	// Set connection callback
-	wifi.setConnectionCallback([](bool connected) {
-		if (connected) {
-			LOG_INF("WiFi connected!");
-		} else {
-			LOG_WRN("WiFi disconnected");
-		}
-	});
+	wifi.setConnectionCallback(wifi_connection_callback);
 
 	// WiFi service is already initialized in main, just monitor status
 	while (1) {
