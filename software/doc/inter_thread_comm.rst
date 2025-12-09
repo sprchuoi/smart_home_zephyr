@@ -296,5 +296,5 @@ See Also
 ********
 
 * :ref:`architecture_overview`
-* :ref:`task_management`
 * :ref:`ble_service`
+* :ref:`wifi_service`

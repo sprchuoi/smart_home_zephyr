@@ -80,7 +80,7 @@ void UartModule::uart_irq_handler(const struct device *dev, void *user_data) {
             }
         }
     }
-}
+}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 
 int UartModule::send(const uint8_t* data, size_t len) {
     if (!uart_dev_ || !data || len == 0) {
