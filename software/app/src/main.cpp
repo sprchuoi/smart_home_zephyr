@@ -14,6 +14,7 @@
 #include "modules/wifi/wifiservice.hpp"
 #include "modules/display/displaymodule.hpp"
 #include "modules/button/buttonmodule.hpp"
+#include "modules/uart/uartmodule.hpp"
 
 // Task headers
 #include "thread/blink_task.h"
@@ -21,6 +22,7 @@
 #include "thread/ble_task.h"
 #include "thread/wifi_task.h"
 #include "thread/display_task.h"
+#include "thread/uart_task.h"
 
 LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 
@@ -129,6 +131,15 @@ static void Os_Start(void)
 		LOG_ERR("Failed to start display task (%d)", ret);
 		return;
 	}
+
+	// Start UART task (interrupt-driven with message queue)
+	k_thread_create(&uart_task_thread, uart_task_stack,
+			K_THREAD_STACK_SIZEOF(uart_task_stack),
+			uart_task_entry,
+			NULL, NULL, NULL,
+			UART_TASK_PRIORITY, 0, K_NO_WAIT);
+	k_thread_name_set(&uart_task_thread, "uart_task");
+	LOG_INF("UART task started");
 
 	LOG_INF("All tasks started successfully");
 }

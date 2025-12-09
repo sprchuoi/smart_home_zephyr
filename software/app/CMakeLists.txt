@@ -29,12 +29,14 @@ target_sources(app PRIVATE
     src/modules/wifi/wifiservice.cpp
     src/modules/display/displaymodule.cpp
     src/modules/button/buttonmodule.cpp
+    src/modules/uart/uartmodule.cpp
     # Threads (C++ task orchestration)
     src/thread/blink_task.cpp
     src/thread/sensor_task.cpp
     src/thread/ble_task.cpp
     src/thread/wifi_task.cpp
     src/thread/display_task.cpp
+    src/thread/uart_task.cpp
 )
 
 target_include_directories(app PRIVATE 
