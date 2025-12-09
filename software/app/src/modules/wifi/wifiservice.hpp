@@ -33,6 +33,7 @@ public:
     
     int connect(const char* ssid, const char* password);
     int startAP(const char* ssid, const char* password);
+    int stopAP();
     int disconnect();
     int scan(ScanResultCallback callback);
     
@@ -47,9 +48,9 @@ private:
     WiFiService& operator=(const WiFiService&) = delete;
     
     static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-                                       uint32_t mgmt_event, struct net_if *iface);
+                                       uint64_t mgmt_event, struct net_if *iface);
     static void wifi_scan_result_handler(struct net_mgmt_event_callback *cb,
-                                        uint32_t mgmt_event, struct net_if *iface);
+                                        uint64_t mgmt_event, struct net_if *iface);
     
     Mode mode_;
     bool connected_;

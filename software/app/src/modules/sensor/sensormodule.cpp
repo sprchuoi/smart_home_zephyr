@@ -9,8 +9,11 @@
 
 LOG_MODULE_REGISTER(sensor_module_cpp, CONFIG_APP_LOG_LEVEL);
 
-#if DT_NODE_EXISTS(DT_NODELABEL(example_sensor))
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(example_sensor), okay)
 #define SENSOR_DEV DEVICE_DT_GET(DT_NODELABEL(example_sensor))
+#define SENSOR_ENABLED 1
+#else
+#define SENSOR_ENABLED 0
 #endif
 
 SensorModule& SensorModule::getInstance() {
@@ -23,7 +26,7 @@ SensorModule::SensorModule() : callback_(nullptr) {
 }
 
 int SensorModule::init() {
-#if DT_NODE_EXISTS(DT_NODELABEL(example_sensor))
+#if SENSOR_ENABLED
     const struct device *sensor = SENSOR_DEV;
     
     if (!device_is_ready(sensor)) {
@@ -40,7 +43,7 @@ int SensorModule::init() {
 }
 
 int SensorModule::read() {
-#if DT_NODE_EXISTS(DT_NODELABEL(example_sensor))
+#if SENSOR_ENABLED
     const struct device *sensor = SENSOR_DEV;
     struct sensor_value val;
     int ret;

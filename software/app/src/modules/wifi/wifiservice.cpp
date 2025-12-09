@@ -101,9 +101,65 @@ int WiFiService::connect(const char* ssid, const char* password) {
 }
 
 int WiFiService::startAP(const char* ssid, const char* password) {
-    LOG_INF("Starting WiFi AP: %s", ssid);
-    // AP mode implementation would go here
+#ifdef CONFIG_ESP32_WIFI_AP_STA_MODE
+    struct net_if *iface = net_if_get_default();
+    
+    if (!iface) {
+        LOG_ERR("No network interface");
+        return -ENODEV;
+    }
+    
+    // Configure AP parameters
+    struct wifi_connect_req_params params = {0};
+    params.ssid = (uint8_t *)ssid;
+    params.ssid_length = strlen(ssid);
+    params.psk = (uint8_t *)password;
+    params.psk_length = strlen(password);
+    params.channel = 6;  // Default channel
+    params.security = (password && strlen(password) > 0) ? 
+                      WIFI_SECURITY_TYPE_PSK : WIFI_SECURITY_TYPE_NONE;
+    params.band = WIFI_FREQ_BAND_2_4_GHZ;
+    
+    LOG_INF("Starting WiFi AP: %s on channel %d", ssid, params.channel);
+    
+    // Start AP mode
+    int ret = net_mgmt(NET_REQUEST_WIFI_AP_ENABLE, iface, &params, sizeof(params));
+    if (ret) {
+        LOG_ERR("Failed to start AP mode (%d)", ret);
+        return ret;
+    }
+    
+    LOG_INF("WiFi AP started successfully");
     return 0;
+#else
+    LOG_WRN("WiFi AP not supported in configuration");
+    return -ENOTSUP;
+#endif
+}
+
+int WiFiService::stopAP() {
+#ifdef CONFIG_ESP32_WIFI_AP_STA_MODE
+    LOG_INF("Stopping WiFi AP mode");
+    
+    struct net_if *iface = net_if_get_default();
+    if (!iface) {
+        LOG_ERR("No network interface");
+        return -ENODEV;
+    }
+    
+    // Disable AP mode
+    int ret = net_mgmt(NET_REQUEST_WIFI_AP_DISABLE, iface, NULL, 0);
+    if (ret) {
+        LOG_ERR("Failed to stop AP mode (%d)", ret);
+        return ret;
+    }
+    
+    LOG_INF("WiFi AP stopped successfully");
+    return 0;
+#else
+    LOG_WRN("WiFi AP not supported in configuration");
+    return -ENOTSUP;
+#endif
 }
 
 int WiFiService::scan(ScanResultCallback callback) {
@@ -168,7 +224,7 @@ int WiFiService::disconnect() {
 }
 
 void WiFiService::wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-                                         uint32_t mgmt_event, struct net_if *iface) {
+                                         uint64_t mgmt_event, struct net_if *iface) {
     WiFiService& instance = getInstance();
     
     if (mgmt_event == NET_EVENT_WIFI_CONNECT_RESULT) {
@@ -191,7 +247,7 @@ void WiFiService::wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 }
 
 void WiFiService::wifi_scan_result_handler(struct net_mgmt_event_callback *cb,
-                                          uint32_t mgmt_event, struct net_if *iface) {
+                                          uint64_t mgmt_event, struct net_if *iface) {
     WiFiService& instance = getInstance();
     
     if (mgmt_event == NET_EVENT_WIFI_SCAN_RESULT) {
