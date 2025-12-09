@@ -22,6 +22,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 target_sources(app PRIVATE 
     src/main.cpp
     src/cpp_support.cpp
+    # Menu system
+    src/menu/menu.cpp
+    src/menu/menu_manager.cpp
     # C++ OOP Modules
     src/modules/blink/blinkmodule.cpp
     src/modules/sensor/sensormodule.cpp

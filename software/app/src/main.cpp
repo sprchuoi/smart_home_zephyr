@@ -16,6 +16,10 @@
 #include "modules/button/buttonmodule.hpp"
 #include "modules/uart/uartmodule.hpp"
 
+// Core infrastructure
+#include "menu/menu.hpp"
+#include "menu/menu_manager.hpp"
+
 // Task headers
 #include "thread/blink_task.h"
 #include "thread/sensor_task.h"
@@ -31,6 +35,13 @@ LOG_MODULE_REGISTER(main, CONFIG_APP_LOG_LEVEL);
 // Forward declarations
 static void Os_Init(void);
 static void Os_Start(void);
+static void menu_display_callback(MenuItem* menu, MenuItem* selected);
+
+// Menu display callback wrapper
+static void menu_display_callback(MenuItem* menu, MenuItem* selected)
+{
+	DisplayModule::getInstance().renderMenu(menu, selected);
+}
 
 extern "C" int main(void)
 {
@@ -90,6 +101,16 @@ static void Os_Init(void)
 		LOG_ERR("Failed to initialize button module (%d)", ret);
 		return;
 	}
+
+	// Initialize menu system
+	ret = MenuManager::getInstance().init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize menu manager (%d)", ret);
+		return;
+	}
+	
+	// Set display callback for menu system
+	MenuSystem::getInstance().setDisplayCallback(menu_display_callback);
 
 	LOG_INF("All modules initialized");
 	printk("Use the sensor to change LED blinking period\n");

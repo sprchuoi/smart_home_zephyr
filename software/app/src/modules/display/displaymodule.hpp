@@ -9,6 +9,9 @@
 #include "core/Module.hpp"
 #include <zephyr/kernel.h>
 
+/* Forward declaration */
+class MenuItem;
+
 class DisplayModule : public Module {
 public:
     static constexpr uint32_t SLEEP_TIMEOUT_MS = 30000;
@@ -21,6 +24,7 @@ public:
     void wake();
     void sleep();
     void updateStatus(const char* line1, const char* line2, const char* line3);
+    void renderMenu(MenuItem* menu, MenuItem* selected);
     bool isSleeping() const { return sleeping_; }
     
 private:

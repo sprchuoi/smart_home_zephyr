@@ -31,6 +31,9 @@ void uart_task_entry(void *p1, void *p2, void *p3);
 K_THREAD_STACK_DECLARE(uart_task_stack, UART_TASK_STACK_SIZE);
 extern struct k_thread uart_task_thread;
 
+
+int uart_task_start(void);
+
 #ifdef __cplusplus
 }
 #endif
