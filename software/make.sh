@@ -31,7 +31,8 @@ show_usage() {
     echo -e "  ${YELLOW}flash${NC}      Flash firmware to ESP32"
     echo -e "  ${YELLOW}monitor${NC}    Open serial monitor"
     echo -e "  ${YELLOW}all${NC}        Build and flash"
-    echo -e "  ${YELLOW}qemu${NC}       Build and run in QEMU (smoke test)"
+    echo -e "  ${YELLOW}qemu${NC}       Build and run in QEMU (ARM smoke test)"
+    echo -e "  ${YELLOW}qemu-esp32${NC} Build and run in ESP32 QEMU (blink test)"
     echo -e "  ${YELLOW}docs${NC}       Build documentation (Sphinx)"
     echo -e "  ${YELLOW}config${NC}     Edit WiFi configuration"
     echo -e "  ${YELLOW}help${NC}       Show this help message"
@@ -45,7 +46,8 @@ show_usage() {
     echo "  ./make.sh build              # Build firmware"
     echo "  ./make.sh flash              # Flash to ESP32"
     echo "  ./make.sh all                # Build and flash"
-    echo "  ./make.sh qemu               # Run smoke test in QEMU"
+    echo "  ./make.sh qemu               # Run ARM smoke test in QEMU"
+    echo "  ./make.sh qemu-esp32         # Run ESP32 blink test in QEMU"
     echo "  ./make.sh docs               # Build documentation"
     echo "  ./make.sh monitor            # Monitor serial output"
     echo "  ./make.sh build --board esp32_devkitc"
@@ -117,9 +119,15 @@ case $COMMAND in
         ;;
     
     qemu)
-        print_header "QEMU Smoke Test"
+        print_header "QEMU Smoke Test (ARM)"
         check_environment
         run_qemu_test
+        ;;
+    
+    qemu-esp32)
+        print_header "ESP32 QEMU Blink LED Test"
+        check_environment
+        run_esp32_qemu_test
         ;;
     
     config)
