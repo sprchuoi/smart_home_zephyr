@@ -13,3 +13,53 @@ endmenu
 module = APP
 module-str = APP
 source "subsys/logging/Kconfig.template.log_config"
+
+menu "Voice Control"
+
+config APP_VOICE_CONTROL
+	bool "Enable voice control features"
+	default y
+	help
+	  Enable voice control with I2S microphone, wake-word detection,
+	  MQTT communication, and OTA updates.
+
+config APP_I2S_MIC
+	bool "Enable I2S microphone"
+	depends on APP_VOICE_CONTROL
+	depends on I2S
+	default y
+	help
+	  Enable I2S MEMS microphone (e.g., INMP441) for audio capture.
+
+config APP_WAKEWORD
+	bool "Enable wake-word detection"
+	depends on APP_VOICE_CONTROL
+	default y
+	help
+	  Enable local wake-word detection for voice activation.
+
+config APP_MQTT
+	bool "Enable MQTT client"
+	depends on APP_VOICE_CONTROL
+	depends on MQTT_LIB
+	depends on NET_IPV4
+	default y
+	help
+	  Enable MQTT client for communication with Raspberry Pi broker.
+
+config APP_OTA
+	bool "Enable OTA updates"
+	depends on APP_VOICE_CONTROL
+	depends on BOOTLOADER_MCUBOOT
+	depends on HTTP_CLIENT
+	default y
+	help
+	  Enable over-the-air firmware updates via HTTP.
+
+config APP_VERSION
+	string "Application version"
+	default "1.0.0"
+	help
+	  Semantic version string for the application.
+
+endmenu

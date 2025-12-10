@@ -54,6 +54,12 @@ if(CONFIG_WIFI)
     )
 endif()
 
+# Add voice control modules subdirectories
+add_subdirectory_ifdef(CONFIG_I2S src/modules/i2s_mic)
+add_subdirectory_ifdef(CONFIG_MQTT_LIB src/modules/mqtt)
+add_subdirectory_ifdef(CONFIG_BOOTLOADER_MCUBOOT src/modules/ota)
+add_subdirectory(src/modules/wakeword)
+
 target_include_directories(app PRIVATE 
     src
     ${CMAKE_CURRENT_SOURCE_DIR}/../include

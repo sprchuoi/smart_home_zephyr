@@ -10,6 +10,7 @@ This is a simple Sphinx documentation setup for ``smart-home-application``.
    architecture
    ble_service
    wifi_service
+   voice_system
    inter_thread_comm
    zephyr
 
