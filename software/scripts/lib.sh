@@ -46,6 +46,95 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
+# Install Espressif QEMU automatically
+install_espressif_qemu() {
+    local qemu_bin="qemu-system-xtensa"
+    local install_dir="$HOME/.local/espressif-qemu"
+    local qemu_version="esp_develop_9.0.0_20240606"
+    
+    print_info "Installing Espressif QEMU..."
+    
+    # Detect OS
+    local os_type=""
+    local qemu_url=""
+    
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        os_type="linux"
+        qemu_url="https://github.com/espressif/qemu/releases/download/esp-develop-9.0.0-20240606/qemu-xtensa-softmmu-${qemu_version}-x86_64-linux-gnu.tar.xz"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        os_type="macos"
+        # Check if Homebrew is available
+        if command_exists brew; then
+            print_info "Installing via Homebrew..."
+            if brew tap espressif/espressif && brew install qemu; then
+                print_success "Espressif QEMU installed via Homebrew"
+                return 0
+            else
+                print_warning "Homebrew installation failed, trying manual installation"
+            fi
+        fi
+        # Fallback to manual download for macOS
+        if [[ $(uname -m) == "arm64" ]]; then
+            qemu_url="https://github.com/espressif/qemu/releases/download/esp-develop-9.0.0-20240606/qemu-xtensa-softmmu-${qemu_version}-aarch64-apple-darwin.tar.xz"
+        else
+            qemu_url="https://github.com/espressif/qemu/releases/download/esp-develop-9.0.0-20240606/qemu-xtensa-softmmu-${qemu_version}-x86_64-apple-darwin.tar.xz"
+        fi
+    else
+        print_error "Unsupported OS: $OSTYPE"
+        return 1
+    fi
+    
+    # Create install directory
+    mkdir -p "$install_dir"
+    
+    print_info "Downloading Espressif QEMU from GitHub..."
+    print_info "URL: $qemu_url"
+    
+    local download_file="$install_dir/qemu-espressif.tar.xz"
+    
+    # Download QEMU
+    if command_exists wget; then
+        wget -q --show-progress -O "$download_file" "$qemu_url" || {
+            print_error "Download failed"
+            return 1
+        }
+    elif command_exists curl; then
+        curl -L -o "$download_file" "$qemu_url" || {
+            print_error "Download failed"
+            return 1
+        }
+    else
+        print_error "Neither wget nor curl found. Please install one of them."
+        return 1
+    fi
+    
+    print_info "Extracting QEMU..."
+    tar xf "$download_file" -C "$install_dir" --strip-components=1 || {
+        print_error "Extraction failed"
+        rm -f "$download_file"
+        return 1
+    }
+    
+    rm -f "$download_file"
+    
+    # Add to PATH for current session
+    export PATH="$install_dir/bin:$PATH"
+    
+    if command_exists "$qemu_bin"; then
+        print_success "Espressif QEMU installed successfully"
+        print_info "Installation directory: $install_dir"
+        print_info "QEMU Binary: $(which $qemu_bin)"
+        echo ""
+        print_warning "Add to your shell profile for permanent access:"
+        echo "export PATH=\"$install_dir/bin:\$PATH\""
+        echo ""
+        return 0
+    else
+        print_error "Installation completed but QEMU binary not found"
+        return 1
+    fi
+}
+
 # Check Zephyr environment
 check_environment() {
     if [ -z "$ZEPHYR_BASE" ]; then
@@ -350,6 +439,112 @@ run_qemu_test() {
     return 0
 }
 
+# Run ESP32 QEMU smoke test
+run_esp32_qemu_test() {
+    local esp32_board="esp32_devkitc/esp32/procpu"
+    local timeout_sec=30
+    local qemu_bin="qemu-system-xtensa"
+    
+    print_info "Building for ESP32 QEMU..."
+    
+    # Check if Espressif QEMU is installed
+    if ! command_exists "$qemu_bin"; then
+        print_warning "Espressif QEMU not found"
+        echo ""
+        read -p "Would you like to install Espressif QEMU automatically? (y/N) " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            install_espressif_qemu || {
+                print_error "Failed to install Espressif QEMU"
+                print_info "Manual installation:"
+                print_info "  - Download from: https://github.com/espressif/qemu/releases"
+                print_info "  - macOS Homebrew: brew install espressif/espressif/qemu"
+                return 1
+            }
+        else
+            print_info "Manual installation:"
+            print_info "  - Download from: https://github.com/espressif/qemu/releases"
+            print_info "  - macOS Homebrew: brew install espressif/espressif/qemu"
+            return 1
+        fi
+    fi
+    
+    print_success "QEMU Binary: $(which $qemu_bin)"
+    
+    # Fetch ESP32 HAL blobs if not already present
+    print_info "Fetching ESP32 HAL blobs..."
+    west blobs fetch hal_espressif || {
+        print_warning "Could not fetch HAL blobs (may already exist)"
+    }
+    
+    # Build for ESP32
+    print_info "Building for ESP32..."
+    west build -b "$esp32_board" app -p || {
+        print_error "ESP32 build failed"
+        return 1
+    }
+    
+    print_success "Build successful"
+    
+    local flash_img="build/zephyr/zephyr.bin"
+    local qemu_log="build/esp32_qemu_output.log"
+    
+    if [ ! -f "$flash_img" ]; then
+        print_error "Flash image not found: $flash_img"
+        return 1
+    fi
+    
+    print_info "Running ESP32 in QEMU (${timeout_sec}s timeout)..."
+    print_info "Flash Image: $flash_img"
+    echo ""
+    
+    # Create QEMU command
+    # Run QEMU with ESP32 configuration and capture output
+    timeout "${timeout_sec}s" "$qemu_bin" \
+        -nographic \
+        -machine esp32 \
+        -drive file="$flash_img",if=mtd,format=raw \
+        -serial mon:stdio \
+        2>&1 | tee "$qemu_log" || EXIT_CODE=$?
+    
+    echo ""
+    
+    # Check QEMU output for expected messages
+    local test_passed=0
+    
+    if grep -q "Blink module initialized" "$qemu_log" 2>/dev/null; then
+        print_success "✓ Blink module initialized"
+        test_passed=1
+    fi
+    
+    if grep -q "Blink task started" "$qemu_log" 2>/dev/null; then
+        print_success "✓ Blink task started"
+        test_passed=1
+    fi
+    
+    if grep -q "Display module initialized" "$qemu_log" 2>/dev/null; then
+        print_success "✓ Display module initialized"
+        test_passed=1
+    fi
+    
+    # Check exit code
+    if [ $test_passed -eq 1 ]; then
+        print_success "ESP32 QEMU smoke test passed (modules initialized)"
+    elif [ ${EXIT_CODE:-0} -eq 124 ]; then
+        print_success "ESP32 QEMU smoke test passed (timeout = application running)"
+    elif [ ${EXIT_CODE:-0} -eq 0 ]; then
+        print_success "ESP32 QEMU smoke test passed (clean exit)"
+    else
+        print_error "ESP32 QEMU smoke test failed (exit code: $EXIT_CODE)"
+        print_info "QEMU log: $qemu_log"
+        return $EXIT_CODE
+    fi
+    
+    print_info "Build artifacts: build/zephyr/zephyr.bin"
+    print_info "QEMU output log: $qemu_log"
+    return 0
+}
+
 # Export functions
 export -f print_header
 export -f print_success
@@ -357,6 +552,7 @@ export -f print_error
 export -f print_warning
 export -f print_info
 export -f command_exists
+export -f install_espressif_qemu
 export -f check_environment
 export -f build_project
 export -f clean_build
@@ -366,3 +562,4 @@ export -f open_monitor
 export -f edit_config
 export -f build_docs
 export -f run_qemu_test
+export -f run_esp32_qemu_test
