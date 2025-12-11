@@ -73,6 +73,26 @@ public:
      */
     bool isModelLoaded() const { return model_loaded_; }
     
+    /**
+     * @brief Get the model backend type
+     * @return String describing the backend
+     */
+    const char* getBackendType() const {
+#ifdef CONFIG_APP_WAKEWORD_EDGE_IMPULSE
+        return "Edge Impulse";
+#elif defined(CONFIG_APP_WAKEWORD_TFLITE)
+        return "TensorFlow Lite Micro";
+#else
+        return "Placeholder (Energy-Based)";
+#endif
+    }
+    
+    /**
+     * @brief Get detection statistics
+     * @return Number of detections since start
+     */
+    uint32_t getDetectionCount() const { return detection_count_; }
+    
 private:
     WakeWordModule();
     ~WakeWordModule() override = default;
@@ -81,7 +101,15 @@ private:
     WakeWordModule& operator=(const WakeWordModule&) = delete;
     
     int loadModel();
+    int loadEdgeImpulseModel();
+    int loadTFLiteModel();
+    int loadPlaceholderModel();
+    
     float runInference(const int16_t* samples, size_t count);
+    float runEdgeImpulseInference(const int16_t* samples, size_t count);
+    float runTFLiteInference(const int16_t* samples, size_t count);
+    float runPlaceholderInference(const int16_t* samples, size_t count);
+    
     void preprocessAudio(const int16_t* samples, size_t count, float* features);
     
     DetectionCallback detection_callback_;
@@ -96,6 +124,17 @@ private:
     
     struct k_mutex mutex_;
     uint32_t detection_count_;
+    
+#ifdef CONFIG_APP_WAKEWORD_TFLITE
+    // TensorFlow Lite Micro context (forward declaration)
+    void* tflite_interpreter_;
+    void* tflite_tensor_arena_;
+#endif
+    
+#ifdef CONFIG_APP_WAKEWORD_EDGE_IMPULSE
+    // Edge Impulse context (forward declaration)
+    void* ei_impulse_;
+#endif
 };
 
 #endif // WAKEWORD_MODULE_HPP

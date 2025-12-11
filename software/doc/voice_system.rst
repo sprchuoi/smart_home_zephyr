@@ -147,6 +147,36 @@ API Reference
 Wake Word Detection
 -------------------
 
+Model Backend Selection
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The wake word module supports multiple machine learning backends:
+
+- **Edge Impulse SDK**: Recommended for ease of use and end-to-end workflow
+- **TensorFlow Lite Micro**: For custom TFLite models
+- **Placeholder**: Energy-based detection for testing (not real wake-word detection)
+
+Configuration
+~~~~~~~~~~~~~
+
+Select backend in ``prj.conf``:
+
+.. code-block:: kconfig
+
+   # Option 1: Edge Impulse (recommended)
+   CONFIG_APP_WAKEWORD_EDGE_IMPULSE=y
+   CONFIG_APP_WAKEWORD_MODEL_PATH="ei_model"
+   CONFIG_APP_WAKEWORD_FEATURE_SIZE=512
+
+   # Option 2: TensorFlow Lite Micro
+   CONFIG_APP_WAKEWORD_TFLITE=y
+   CONFIG_APP_WAKEWORD_MODEL_PATH="g_wakeword_model"
+   CONFIG_APP_WAKEWORD_ARENA_SIZE=8192
+   CONFIG_APP_WAKEWORD_FEATURE_SIZE=512
+
+   # Option 3: Placeholder (default, for testing)
+   CONFIG_APP_WAKEWORD_PLACEHOLDER=y
+
 Local Processing
 ~~~~~~~~~~~~~~~~
 
@@ -154,29 +184,38 @@ Lightweight wake word detection runs on ESP32:
 
 .. code-block:: cpp
 
-   class WakeWordDetector {
+   class WakeWordModule : public Module {
    public:
-       static WakeWordDetector& getInstance();
+       static WakeWordModule& getInstance();
        
-       // Initialize with model
-       int init(const char* model_path);
+       // Initialize and load model
+       int init() override;
        
        // Process audio frame
-       bool detect(const int16_t* audio, size_t samples);
+       DetectionResult process(const int16_t* audio, size_t samples);
        
        // Set detection callback
-       void setCallback(void (*callback)(const char* word));
+       void setDetectionCallback(DetectionCallback callback);
+       
+       // Configure threshold
+       void setThreshold(float threshold);
+       
+       // Get backend type
+       const char* getBackendType() const;
        
    private:
-       static constexpr float CONFIDENCE_THRESHOLD = 0.8f;
+       static constexpr float DEFAULT_THRESHOLD = 0.7f;
    };
 
 Supported Wake Words
 ~~~~~~~~~~~~~~~~~~~~
 
-- "Hey ESP"
-- "OK Home"
-- Custom trained models via Edge Impulse
+- Custom wake words trained with Edge Impulse Studio
+- Pre-trained models: "Hey ESP", "OK Home", etc.
+- Any keyword with sufficient training data (recommended: 50+ samples per keyword)
+
+For detailed integration instructions, see:
+``software/app/src/modules/wakeword/README.md``
 
 MQTT Module
 -----------
