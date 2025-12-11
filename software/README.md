@@ -19,6 +19,9 @@ Voice-controlled smart home system built on Zephyr RTOS for ESP32, featuring loc
 
 ### Core Capabilities
 - **Voice Control**: I2S microphone (INMP441) with local wake-word detection
+  - Supports Edge Impulse models (TensorFlow Lite for Microcontrollers)
+  - Custom model format support
+  - Placeholder mode for testing
 - **MQTT Communication**: Publish/subscribe to Raspberry Pi broker (Mosquitto)
 - **OTA Updates**: HTTP-based firmware updates from Pi
 - **WiFi Connectivity**: STA and AP+STA modes with auto-reconnect
@@ -260,7 +263,7 @@ Documentation includes:
 - **Architecture** - System design and patterns
 - **BLE Service** - Bluetooth Low Energy API
 - **WiFi Service** - WiFi connectivity and AP mode
-- **Voice System** - I2S microphone, wake-word, MQTT, OTA
+- **Voice System** - I2S microphone, wake-word (with Edge Impulse integration), MQTT, OTA
 - **Inter-thread Communication** - Message queues and semaphores
 
 ### Manual Build

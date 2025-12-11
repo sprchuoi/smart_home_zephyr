@@ -1,0 +1,4 @@
+
+# Wake-word model data (user-specific, may be proprietary)
+model_data.h
+*.tflite
