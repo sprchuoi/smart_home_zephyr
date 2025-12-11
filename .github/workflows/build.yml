@@ -121,6 +121,12 @@ jobs:
           cd zephyr-sdk-0.17.4
           ./setup.sh -t xtensa-espressif_esp32_zephyr-elf -h -c
 
+      - name: Install QEMU dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-2.0-0 libpixman-1-0
+
       - name: Install Espressif QEMU
         shell: bash
         run: |
