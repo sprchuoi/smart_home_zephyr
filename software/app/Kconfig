@@ -38,6 +38,57 @@ config APP_WAKEWORD
 	help
 	  Enable local wake-word detection for voice activation.
 
+if APP_WAKEWORD
+
+choice APP_WAKEWORD_MODEL_TYPE
+	prompt "Wake-word model type"
+	default APP_WAKEWORD_MODEL_EDGE_IMPULSE
+	help
+	  Select the type of model to use for wake-word detection.
+
+config APP_WAKEWORD_MODEL_EDGE_IMPULSE
+	bool "Edge Impulse model"
+	help
+	  Use an Edge Impulse trained model (TensorFlow Lite for Microcontrollers).
+
+config APP_WAKEWORD_MODEL_CUSTOM
+	bool "Custom model"
+	help
+	  Use a custom model format.
+
+config APP_WAKEWORD_MODEL_PLACEHOLDER
+	bool "Placeholder (energy-based detection)"
+	help
+	  Use simple energy-based detection for testing without a real model.
+
+endchoice
+
+config APP_WAKEWORD_MODEL_FILE
+	string "Model file path"
+	default "wakeword_model.tflite"
+	depends on APP_WAKEWORD_MODEL_EDGE_IMPULSE || APP_WAKEWORD_MODEL_CUSTOM
+	help
+	  Path to the model file (relative to project root or absolute).
+	  For Edge Impulse, this should be a .tflite file.
+
+config APP_WAKEWORD_MODEL_EMBEDDED
+	bool "Embed model in binary"
+	default y
+	depends on APP_WAKEWORD_MODEL_EDGE_IMPULSE || APP_WAKEWORD_MODEL_CUSTOM
+	help
+	  Embed the model data directly in the firmware binary.
+	  If disabled, model will be loaded from external storage.
+
+config APP_WAKEWORD_ARENA_SIZE
+	int "TensorFlow Lite arena size (bytes)"
+	default 8192
+	depends on APP_WAKEWORD_MODEL_EDGE_IMPULSE
+	help
+	  Memory arena size for TensorFlow Lite Micro operations.
+	  Adjust based on model complexity.
+
+endif # APP_WAKEWORD
+
 config APP_MQTT
 	bool "Enable MQTT client"
 	depends on APP_VOICE_CONTROL

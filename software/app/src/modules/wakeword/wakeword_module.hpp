@@ -7,6 +7,7 @@
 #define WAKEWORD_MODULE_HPP
 
 #include "core/Module.hpp"
+#include "model_loader.hpp"
 #include <zephyr/kernel.h>
 
 /**
@@ -75,7 +76,7 @@ public:
     
 private:
     WakeWordModule();
-    ~WakeWordModule() override = default;
+    ~WakeWordModule() override;
     
     WakeWordModule(const WakeWordModule&) = delete;
     WakeWordModule& operator=(const WakeWordModule&) = delete;
@@ -88,6 +89,7 @@ private:
     float threshold_;
     bool model_loaded_;
     bool running_;
+    ModelLoader* model_loader_;
     
     // Feature extraction buffers
     float feature_buffer_[WINDOW_SIZE];

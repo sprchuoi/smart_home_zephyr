@@ -1,0 +1,38 @@
+/*
+ * Copyright (c) 2025 Sprchuoi
+ * SPDX-License-Identifier: Apache-2.0
+ * 
+ * EXAMPLE: Edge Impulse Model Data Template
+ * 
+ * To use your own model:
+ * 1. Export your trained model from Edge Impulse as TensorFlow Lite (int8 or float32)
+ * 2. Convert the .tflite file to a C array:
+ *    xxd -i your_model.tflite > model_data.h
+ * 3. Replace the placeholder arrays below with your model data
+ * 4. Uncomment the model loading code in model_loader.cpp
+ */
+
+#ifndef MODEL_DATA_H
+#define MODEL_DATA_H
+
+// Example placeholder - replace with actual model data from xxd output
+// const unsigned char g_model_data[] = {
+//   0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33, 0x00, 0x00, 0x12, 0x00,
+//   // ... rest of your model data ...
+// };
+// const unsigned int g_model_data_len = sizeof(g_model_data);
+
+/*
+ * Expected xxd output format:
+ * 
+ * unsigned char your_model_tflite[] = {
+ *   0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33, 0x00, 0x00, 0x12, 0x00,
+ *   0x1c, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00,
+ *   ... (many more bytes) ...
+ * };
+ * unsigned int your_model_tflite_len = 12345;  // actual size
+ * 
+ * Then rename to g_model_data and g_model_data_len
+ */
+
+#endif // MODEL_DATA_H
