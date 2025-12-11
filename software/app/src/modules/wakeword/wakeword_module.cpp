@@ -173,9 +173,9 @@ int WakeWordModule::loadEdgeImpulseModel() {
     LOG_INF("Model path/symbol: %s", CONFIG_APP_WAKEWORD_MODEL_PATH);
     
     model_loaded_ = false;
-    return -ENOSYS;  // Function not implemented
+    return -ENOENT;  // Model library/file not found
 #else
-    return -ENOTSUP;
+    return -ENOTSUP;  // Backend not supported in this build
 #endif
 }
 
@@ -200,9 +200,9 @@ int WakeWordModule::loadTFLiteModel() {
     LOG_INF("Arena size: %d bytes", CONFIG_APP_WAKEWORD_ARENA_SIZE);
     
     model_loaded_ = false;
-    return -ENOSYS;  // Function not implemented
+    return -ENOENT;  // Model library/file not found
 #else
-    return -ENOTSUP;
+    return -ENOTSUP;  // Backend not supported in this build
 #endif
 }
 
