@@ -20,8 +20,9 @@ public:
     using ConnectionCallback = void (*)(bool connected);
     using ScanResultCallback = void (*)(struct wifi_scan_result *entry);
     
-    static constexpr const char* DEFAULT_SSID = "ESP32_SmartHome_AP";
-    static constexpr const char* DEFAULT_PASSWORD = "12345678";
+    // Default credentials (use wifi_config.conf to override)
+    static constexpr const char* DEFAULT_SSID = "ESP32_Network";
+    static constexpr const char* DEFAULT_PASSWORD = "password123";
     
     static WiFiService& getInstance();
     

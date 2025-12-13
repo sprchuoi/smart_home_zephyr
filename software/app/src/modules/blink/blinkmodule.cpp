@@ -6,8 +6,9 @@
 #include "blinkmodule.hpp"
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include "app_log.h"
 
-LOG_MODULE_REGISTER(blink_module_cpp, CONFIG_APP_LOG_LEVEL);
+LOG_MODULE_REGISTER(blink_module_cpp, APP_LOG_LEVEL);
 
 // Define the LED GPIO spec from device tree
 #if DT_NODE_EXISTS(DT_ALIAS(led0))
@@ -36,11 +37,12 @@ int BlinkModule::init() {
         LOG_ERR("Failed to configure LED GPIO (%d)", ret);
         return ret;
     }
-    
+    printk("Blink module initialized (period: %u ms)", period_ms_);
     LOG_INF("Blink module initialized (period: %u ms)", period_ms_);
     return 0;
 #else
     LOG_WRN("LED not configured in device tree");
+    printk("LED not configured in device tree");
     return -ENOTSUP;
 #endif
 }

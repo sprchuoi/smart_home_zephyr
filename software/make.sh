@@ -28,6 +28,7 @@ show_usage() {
     echo -e "  ${YELLOW}setup${NC}      Setup Zephyr environment (first time only)"
     echo -e "  ${YELLOW}build${NC}      Build the application"
     echo -e "  ${YELLOW}clean${NC}      Clean build artifacts"
+    echo -e "  ${YELLOW}attach${NC}     Attach ESP32 USB device to WSL and optionally flash"
     echo -e "  ${YELLOW}flash${NC}      Flash firmware to ESP32"
     echo -e "  ${YELLOW}monitor${NC}    Open serial monitor"
     echo -e "  ${YELLOW}all${NC}        Build and flash"
@@ -44,6 +45,7 @@ show_usage() {
     echo "Examples:"
     echo "  ./make.sh setup              # First time setup"
     echo "  ./make.sh build              # Build firmware"
+    echo "  ./make.sh attach             # Attach ESP32 to WSL (interactive)"
     echo "  ./make.sh flash              # Flash to ESP32"
     echo "  ./make.sh all                # Build and flash"
     echo "  ./make.sh qemu               # Run ARM smoke test in QEMU"
@@ -96,6 +98,11 @@ case $COMMAND in
     clean)
         print_header "Cleaning Build"
         clean_build
+        ;;
+    
+    attach)
+        print_header "Attach ESP32 to WSL"
+        attach_esp32
         ;;
     
     flash)

@@ -54,7 +54,6 @@ static void menu_display_callback(MenuItem* menu, MenuItem* selected)
 extern "C" int main(void)
 {
 	printk("Zephyr Example Application %s\n", APP_VERSION_STRING);
-	printk("ESP32-WROOM-32 with C++ OOP Architecture\n");
 
 	Os_Init(); // Initialize OS and modules
 	
@@ -73,6 +72,7 @@ static void Os_Init(void)
 	int ret;
 	
 	// Zephyr OS initializes itself automatically.
+	printk("Init OS and modules...\n");
 	// Initialize all modules using C++ singletons
 	ret = BlinkModule::getInstance().init();
 	if (ret < 0) {
@@ -82,8 +82,7 @@ static void Os_Init(void)
 
 	ret = SensorModule::getInstance().init();
 	if (ret < 0) {
-		LOG_ERR("Failed to initialize sensor module (%d)", ret);
-		return;
+		LOG_WRN("Sensor module not available (%d) - continuing without sensor", ret);
 	}
 
 #if defined(CONFIG_BT)
@@ -110,8 +109,7 @@ static void Os_Init(void)
 
 	ret = ButtonModule::getInstance().init();
 	if (ret < 0) {
-		LOG_ERR("Failed to initialize button module (%d)", ret);
-		return;
+		LOG_WRN("Button module not available (%d) - continuing without button", ret);
 	}
 
 	// Initialize menu system

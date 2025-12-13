@@ -114,3 +114,33 @@ config APP_VERSION
 	  Semantic version string for the application.
 
 endmenu
+
+menu "WiFi Configuration"
+
+config WIFI_SSID
+	string "WiFi SSID for station mode"
+	default "ESP32_Network"
+	help
+	  WiFi network SSID to connect to in station mode.
+	  Override in wifi_config.conf (gitignored).
+
+config WIFI_PASSWORD
+	string "WiFi password for station mode"
+	default "password123"
+	help
+	  WiFi network password for station mode.
+	  Override in wifi_config.conf (gitignored).
+
+config WIFI_AP_SSID
+	string "WiFi SSID for AP mode"
+	default "ESP32_SmartHome"
+	help
+	  WiFi access point SSID when running in AP mode.
+
+config WIFI_AP_PASSWORD
+	string "WiFi password for AP mode"
+	default "12345678"
+	help
+	  WiFi access point password (minimum 8 characters).
+
+endmenu

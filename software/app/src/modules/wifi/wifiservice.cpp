@@ -52,7 +52,14 @@ int WiFiService::start() {
     }
     
     if (mode_ == Mode::AP || mode_ == Mode::AP_STA) {
-        return startAP(DEFAULT_SSID, DEFAULT_PASSWORD);
+#ifdef CONFIG_WIFI_AP_SSID
+        const char* ap_ssid = CONFIG_WIFI_AP_SSID;
+        const char* ap_pass = CONFIG_WIFI_AP_PASSWORD;
+#else
+        const char* ap_ssid = CONFIG_WIFI_SSID;
+        const char* ap_pass = CONFIG_WIFI_PASSWORD;
+#endif
+        return startAP(ap_ssid, ap_pass);
     }
     
     return 0;

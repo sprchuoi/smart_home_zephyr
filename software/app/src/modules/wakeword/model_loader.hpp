@@ -9,6 +9,7 @@
 #include <zephyr/kernel.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <math.h>
 
 /**
  * @brief Model loader interface for wake-word detection models

@@ -113,6 +113,16 @@ cd smart-home-zephyr/software
 ./make.sh setup
 ```
 
+#### 1. Configure WiFi Credentials (Optional but recommended)
+
+```shell
+cd app
+cp wifi_config.conf.template wifi_config.conf
+nano wifi_config.conf  # Edit with your WiFi SSID and password
+```
+
+**Note:** `wifi_config.conf` is gitignored and won't be committed. See [WIFI_CONFIG.md](app/WIFI_CONFIG.md) for details.
+
 #### 2. Build Firmware
 
 **Full Build (all features)**

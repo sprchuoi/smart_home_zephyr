@@ -29,11 +29,14 @@ static void ble_task_entry(void *arg1, void *arg2, void *arg3)
 
 	LOG_INF("BLE task started");
 
+	/* Wait for BLE to be fully initialized */
+	k_sleep(K_MSEC(500));
+
 	/* Start advertising */
 	err = ble.startAdvertising();
 	if (err) {
-		LOG_ERR("Failed to start advertising");
-		return;
+		LOG_ERR("Failed to start advertising (err %d) - will retry", err);
+		/* Don't return, retry later */
 	}
 
 	/* Periodically send "Hello World" notifications */

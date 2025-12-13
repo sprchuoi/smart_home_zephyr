@@ -223,6 +223,160 @@ detect_serial_port() {
     echo "$port"
 }
 
+# Attach ESP32 USB device to WSL
+attach_esp32() {
+    local BUSID="2-1"
+    local DEVICE_NAME="CP210x"
+    
+    # Check if running in WSL
+    if ! grep -qi microsoft /proc/version; then
+        print_error "This command must be run in WSL"
+        echo ""
+        echo "If you're on Windows, run this in PowerShell as Administrator:"
+        echo "  cd software\\scripts"
+        echo "  .\\attach-esp32.ps1"
+        exit 1
+    fi
+    
+    # Check if usbipd is installed on Windows
+    if ! powershell.exe -Command "Get-Command usbipd" > /dev/null 2>&1; then
+        print_error "usbipd-win is not installed on Windows"
+        echo ""
+        echo "Please install it from:"
+        echo "  https://github.com/dorssel/usbipd-win/releases"
+        echo "Or run in PowerShell as Administrator:"
+        echo "  winget install --interactive --exact dorssel.usbipd-win"
+        exit 1
+    fi
+    
+    print_info "Checking USB device status..."
+    echo ""
+    
+    # List available devices
+    powershell.exe -Command "usbipd list" 2>/dev/null || {
+        print_error "Failed to list USB devices"
+        exit 1
+    }
+    
+    echo ""
+    print_info "Attempting to attach $DEVICE_NAME (BUSID: $BUSID)..."
+    echo ""
+    
+    # Try to attach the device
+    powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-Command', 'usbipd attach --wsl --busid $BUSID'" 2>/dev/null || {
+        print_warning "Auto-attach failed. Run manually in PowerShell as Administrator:"
+        echo ""
+        echo "  usbipd attach --wsl --busid $BUSID"
+        echo ""
+        exit 1
+    }
+    
+    # Wait for device to appear
+    print_info "Waiting for device to appear in WSL..."
+    for i in {1..10}; do
+        if [ -e /dev/ttyUSB0 ] || [ -e /dev/ttyACM0 ]; then
+            print_success "Device detected!"
+            break
+        fi
+        sleep 1
+        echo -n "."
+    done
+    echo ""
+    
+    # Check if device is available
+    local DEVICE=""
+    if [ -e /dev/ttyUSB0 ]; then
+        DEVICE="/dev/ttyUSB0"
+    elif [ -e /dev/ttyACM0 ]; then
+        DEVICE="/dev/ttyACM0"
+    else
+        print_warning "Device not found in /dev/"
+        echo ""
+        echo "Searching for USB serial devices..."
+        ls -la /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || echo "  No serial devices found"
+        echo ""
+        echo "If device is attached but not accessible, you may need to:"
+        echo "  1. Add yourself to dialout group: sudo usermod -a -G dialout \$USER"
+        echo "  2. Activate group: newgrp dialout"
+        echo "  3. Or run: sudo chmod 666 /dev/ttyUSB0"
+        exit 1
+    fi
+    
+    # Check permissions
+    echo ""
+    print_info "Checking device permissions: $DEVICE"
+    ls -l $DEVICE
+    
+    if [ ! -r "$DEVICE" ] || [ ! -w "$DEVICE" ]; then
+        echo ""
+        print_warning "Device exists but you don't have permission to access it"
+        echo ""
+        echo "Quick fix (this session only):"
+        echo "  sudo chmod 666 $DEVICE"
+        echo ""
+        echo "Permanent fix:"
+        echo "  sudo usermod -a -G dialout \$USER"
+        echo "  newgrp dialout"
+        echo ""
+        
+        read -p "Fix permissions for this session? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            sudo chmod 666 $DEVICE
+            print_success "Permissions fixed for this session"
+        fi
+    fi
+    
+    echo ""
+    print_success "ESP32 attached and ready"
+    print_info "Device: $DEVICE"
+    echo ""
+    
+    # Ask if user wants to flash firmware
+    read -p "Flash firmware now? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo ""
+        
+        # Check if build exists
+        if [ ! -f "build/zephyr/zephyr.bin" ]; then
+            print_warning "No firmware found at build/zephyr/zephyr.bin"
+            echo ""
+            read -p "Build firmware first? (y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo ""
+                check_environment
+                build_project "esp32_devkitc"
+            else
+                print_info "Skipping flash."
+                return 0
+            fi
+        fi
+        
+        # Flash firmware
+        flash_firmware "$DEVICE"
+        
+        echo ""
+        read -p "Monitor serial output? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo ""
+            print_info "Starting serial monitor (Ctrl+A then K to exit)..."
+            sleep 1
+            open_monitor "$DEVICE"
+        fi
+    else
+        echo ""
+        print_info "You can flash firmware later with:"
+        echo "  ./make.sh flash --port $DEVICE"
+        echo ""
+        print_info "Or monitor output:"
+        echo "  ./make.sh monitor --port $DEVICE"
+        echo ""
+    fi
+}
+
 # Flash firmware
 flash_firmware() {
     local port="$1"
@@ -286,14 +440,19 @@ open_monitor() {
     print_info "Port: $port"
     print_info "Baudrate: $baudrate"
     echo ""
-    print_info "Press Ctrl+A then K to exit screen"
-    print_info "Press RESET button on ESP32 to restart"
-    echo ""
-    sleep 2
     
     if command_exists screen; then
+        print_warning "To exit: Press Ctrl+A, then type ':quit' and press Enter"
+        print_warning "Or: Press Ctrl+A, then press '\\' (backslash), then press 'y'"
+        print_info "Press RESET button on ESP32 to restart"
+        echo ""
+        sleep 2
         screen "$port" "$baudrate"
     elif command_exists minicom; then
+        print_warning "To exit: Press Ctrl+A, then press X"
+        print_info "Press RESET button on ESP32 to restart"
+        echo ""
+        sleep 2
         minicom -D "$port" -b "$baudrate"
     else
         print_error "No serial monitor found"
