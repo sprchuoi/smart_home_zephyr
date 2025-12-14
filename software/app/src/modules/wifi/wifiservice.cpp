@@ -52,7 +52,14 @@ int WiFiService::start() {
     }
     
     if (mode_ == Mode::AP || mode_ == Mode::AP_STA) {
-        return startAP(DEFAULT_SSID, DEFAULT_PASSWORD);
+#ifdef CONFIG_WIFI_AP_SSID
+        const char* ap_ssid = CONFIG_WIFI_AP_SSID;
+        const char* ap_pass = CONFIG_WIFI_AP_PASSWORD;
+#else
+        const char* ap_ssid = CONFIG_WIFI_SSID;
+        const char* ap_pass = CONFIG_WIFI_PASSWORD;
+#endif
+        return startAP(ap_ssid, ap_pass);
     }
     
     return 0;
@@ -82,17 +89,41 @@ int WiFiService::connect(const char* ssid, const char* password) {
     params.ssid_length = strlen(ssid);
     params.psk = (uint8_t *)password;
     params.psk_length = strlen(password);
-    params.channel = WIFI_CHANNEL_ANY;
-    params.security = WIFI_SECURITY_TYPE_PSK;
+    
+    // Channel optimization: Use configured channel hint if available
+#ifdef CONFIG_WIFI_CHANNEL
+    if (CONFIG_WIFI_CHANNEL > 0 && CONFIG_WIFI_CHANNEL <= 13) {
+        params.channel = CONFIG_WIFI_CHANNEL;
+        LOG_INF("Using channel hint: %d (faster connection)", CONFIG_WIFI_CHANNEL);
+    } else {
+        params.channel = WIFI_CHANNEL_ANY;  // Scan all channels
+    }
+#else
+    params.channel = WIFI_CHANNEL_ANY;  // Scan all channels
+#endif
+    
+    params.security = WIFI_SECURITY_TYPE_PSK;  // Auto-negotiate WPA/WPA2/WPA3
+    params.band = WIFI_FREQ_BAND_2_4_GHZ;
+    params.mfp = WIFI_MFP_OPTIONAL;
+    
+    // Connection timeout: 15 seconds is reasonable
+    params.timeout = 15000;  // 15 seconds timeout
     
     LOG_INF("Connecting to WiFi: %s", ssid);
     
     int ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &params, sizeof(params));
     if (ret) {
-        LOG_ERR("WiFi connect failed (%d)", ret);
+        // EALREADY (-120) means connection is already in progress, which is OK
+        // The actual result will come via the event callback
+        if (ret == -EALREADY) {
+            LOG_DBG("Connection already in progress");
+            return ret;  // Return the code but don't treat as error
+        }
+        LOG_ERR("WiFi connect request failed (%d)", ret);
         return ret;
     }
     
+    LOG_DBG("WiFi connection request submitted");
     return 0;
 #else
     LOG_WRN("WiFi not enabled in configuration");

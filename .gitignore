@@ -1,0 +1,7 @@
+
+# Wake-word model data (user-specific, may be proprietary)
+model_data.h
+*.tflite
+
+# WiFi credentials (private configuration)
+software/app/wifi_config.conf

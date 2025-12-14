@@ -54,7 +54,7 @@ void uart_task_entry(void *p1, void *p2, void *p3) {
     UartModule& uart = UartModule::getInstance();
     int ret = uart.init(&uart_msgq);
     if (ret < 0) {
-        LOG_ERR("Failed to initialize UART: %d", ret);
+        LOG_WRN("UART module not available (%d) - task will exit", ret);
         return;
     }
     

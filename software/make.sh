@@ -28,6 +28,7 @@ show_usage() {
     echo -e "  ${YELLOW}setup${NC}      Setup Zephyr environment (first time only)"
     echo -e "  ${YELLOW}build${NC}      Build the application"
     echo -e "  ${YELLOW}clean${NC}      Clean build artifacts"
+    echo -e "  ${YELLOW}attach${NC}     Attach ESP32 USB device to WSL and optionally flash"
     echo -e "  ${YELLOW}flash${NC}      Flash firmware to ESP32"
     echo -e "  ${YELLOW}monitor${NC}    Open serial monitor"
     echo -e "  ${YELLOW}all${NC}        Build and flash"
@@ -40,10 +41,12 @@ show_usage() {
     echo "Options:"
     echo "  --board <name>     Specify board (default: esp32_devkitc_wroom)"
     echo "  --port <device>    Specify serial port (default: auto-detect)"
+    echo "  --                 Pass additional arguments to west build"
     echo ""
     echo "Examples:"
     echo "  ./make.sh setup              # First time setup"
     echo "  ./make.sh build              # Build firmware"
+    echo "  ./make.sh attach             # Attach ESP32 to WSL (interactive)"
     echo "  ./make.sh flash              # Flash to ESP32"
     echo "  ./make.sh all                # Build and flash"
     echo "  ./make.sh qemu               # Run ARM smoke test in QEMU"
@@ -51,6 +54,8 @@ show_usage() {
     echo "  ./make.sh docs               # Build documentation"
     echo "  ./make.sh monitor            # Monitor serial output"
     echo "  ./make.sh build --board esp32_devkitc"
+    echo "  ./make.sh build -- -DEXTRA_CONF_FILE=app/wifi_config.conf"
+    echo "  ./make.sh build -- -DCONF_FILE=voice.conf"
     echo ""
 }
 
@@ -61,6 +66,7 @@ shift || true
 # Parse options
 BOARD="esp32_devkitc"
 PORT=""
+BUILD_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -71,6 +77,11 @@ while [[ $# -gt 0 ]]; do
         --port)
             PORT="$2"
             shift 2
+            ;;
+        --)
+            shift
+            BUILD_ARGS=("$@")
+            break
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
@@ -90,12 +101,17 @@ case $COMMAND in
     build)
         print_header "Building Application"
         check_environment
-        build_project "$BOARD"
+        build_project "$BOARD" "${BUILD_ARGS[@]}"
         ;;
     
     clean)
         print_header "Cleaning Build"
         clean_build
+        ;;
+    
+    attach)
+        print_header "Attach ESP32 to WSL"
+        attach_esp32
         ;;
     
     flash)
@@ -112,7 +128,7 @@ case $COMMAND in
     all)
         print_header "Build and Flash"
         check_environment
-        build_project "$BOARD"
+        build_project "$BOARD" "${BUILD_ARGS[@]}"
         flash_firmware "$PORT"
         echo ""
         echo -e "${GREEN}Done! Run './make.sh monitor' to see output${NC}"

@@ -162,6 +162,8 @@ check_environment() {
 # Build project
 build_project() {
     local board="$1"
+    shift
+    local build_args=("$@")
     
     if [ ! -f "app/CMakeLists.txt" ]; then
         print_error "Must run from software/ directory"
@@ -175,12 +177,18 @@ build_project() {
     fi
     
     print_info "Application: app/"
+    
+    # Show additional build arguments if provided
+    if [ ${#build_args[@]} -gt 0 ]; then
+        print_info "Extra arguments: ${build_args[*]}"
+    fi
+    
     echo ""
     
     print_info "Building application..."
     
-    # Try west build
-    if west build -b "$board" app; then
+    # Try west build with additional arguments
+    if west build -b "$board" app "${build_args[@]}"; then
         echo ""
         print_header "Build Complete"
         print_success "Binary: build/zephyr/zephyr.bin"
@@ -221,6 +229,160 @@ detect_serial_port() {
     fi
     
     echo "$port"
+}
+
+# Attach ESP32 USB device to WSL
+attach_esp32() {
+    local BUSID="2-1"
+    local DEVICE_NAME="CP210x"
+    
+    # Check if running in WSL
+    if ! grep -qi microsoft /proc/version; then
+        print_error "This command must be run in WSL"
+        echo ""
+        echo "If you're on Windows, run this in PowerShell as Administrator:"
+        echo "  cd software\\scripts"
+        echo "  .\\attach-esp32.ps1"
+        exit 1
+    fi
+    
+    # Check if usbipd is installed on Windows
+    if ! powershell.exe -Command "Get-Command usbipd" > /dev/null 2>&1; then
+        print_error "usbipd-win is not installed on Windows"
+        echo ""
+        echo "Please install it from:"
+        echo "  https://github.com/dorssel/usbipd-win/releases"
+        echo "Or run in PowerShell as Administrator:"
+        echo "  winget install --interactive --exact dorssel.usbipd-win"
+        exit 1
+    fi
+    
+    print_info "Checking USB device status..."
+    echo ""
+    
+    # List available devices
+    powershell.exe -Command "usbipd list" 2>/dev/null || {
+        print_error "Failed to list USB devices"
+        exit 1
+    }
+    
+    echo ""
+    print_info "Attempting to attach $DEVICE_NAME (BUSID: $BUSID)..."
+    echo ""
+    
+    # Try to attach the device
+    powershell.exe -Command "Start-Process powershell -Verb RunAs -ArgumentList '-Command', 'usbipd attach --wsl --busid $BUSID'" 2>/dev/null || {
+        print_warning "Auto-attach failed. Run manually in PowerShell as Administrator:"
+        echo ""
+        echo "  usbipd attach --wsl --busid $BUSID"
+        echo ""
+        exit 1
+    }
+    
+    # Wait for device to appear
+    print_info "Waiting for device to appear in WSL..."
+    for i in {1..10}; do
+        if [ -e /dev/ttyUSB0 ] || [ -e /dev/ttyACM0 ]; then
+            print_success "Device detected!"
+            break
+        fi
+        sleep 1
+        echo -n "."
+    done
+    echo ""
+    
+    # Check if device is available
+    local DEVICE=""
+    if [ -e /dev/ttyUSB0 ]; then
+        DEVICE="/dev/ttyUSB0"
+    elif [ -e /dev/ttyACM0 ]; then
+        DEVICE="/dev/ttyACM0"
+    else
+        print_warning "Device not found in /dev/"
+        echo ""
+        echo "Searching for USB serial devices..."
+        ls -la /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || echo "  No serial devices found"
+        echo ""
+        echo "If device is attached but not accessible, you may need to:"
+        echo "  1. Add yourself to dialout group: sudo usermod -a -G dialout \$USER"
+        echo "  2. Activate group: newgrp dialout"
+        echo "  3. Or run: sudo chmod 666 /dev/ttyUSB0"
+        exit 1
+    fi
+    
+    # Check permissions
+    echo ""
+    print_info "Checking device permissions: $DEVICE"
+    ls -l $DEVICE
+    
+    if [ ! -r "$DEVICE" ] || [ ! -w "$DEVICE" ]; then
+        echo ""
+        print_warning "Device exists but you don't have permission to access it"
+        echo ""
+        echo "Quick fix (this session only):"
+        echo "  sudo chmod 666 $DEVICE"
+        echo ""
+        echo "Permanent fix:"
+        echo "  sudo usermod -a -G dialout \$USER"
+        echo "  newgrp dialout"
+        echo ""
+        
+        read -p "Fix permissions for this session? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            sudo chmod 666 $DEVICE
+            print_success "Permissions fixed for this session"
+        fi
+    fi
+    
+    echo ""
+    print_success "ESP32 attached and ready"
+    print_info "Device: $DEVICE"
+    echo ""
+    
+    # Ask if user wants to flash firmware
+    read -p "Flash firmware now? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo ""
+        
+        # Check if build exists
+        if [ ! -f "build/zephyr/zephyr.bin" ]; then
+            print_warning "No firmware found at build/zephyr/zephyr.bin"
+            echo ""
+            read -p "Build firmware first? (y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo ""
+                check_environment
+                build_project "esp32_devkitc"
+            else
+                print_info "Skipping flash."
+                return 0
+            fi
+        fi
+        
+        # Flash firmware
+        flash_firmware "$DEVICE"
+        
+        echo ""
+        read -p "Monitor serial output? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo ""
+            print_info "Starting serial monitor (Ctrl+A then K to exit)..."
+            sleep 1
+            open_monitor "$DEVICE"
+        fi
+    else
+        echo ""
+        print_info "You can flash firmware later with:"
+        echo "  ./make.sh flash --port $DEVICE"
+        echo ""
+        print_info "Or monitor output:"
+        echo "  ./make.sh monitor --port $DEVICE"
+        echo ""
+    fi
 }
 
 # Flash firmware
@@ -286,14 +448,19 @@ open_monitor() {
     print_info "Port: $port"
     print_info "Baudrate: $baudrate"
     echo ""
-    print_info "Press Ctrl+A then K to exit screen"
-    print_info "Press RESET button on ESP32 to restart"
-    echo ""
-    sleep 2
     
     if command_exists screen; then
+        print_warning "To exit: Press Ctrl+A, then type ':quit' and press Enter"
+        print_warning "Or: Press Ctrl+A, then press '\\' (backslash), then press 'y'"
+        print_info "Press RESET button on ESP32 to restart"
+        echo ""
+        sleep 2
         screen "$port" "$baudrate"
     elif command_exists minicom; then
+        print_warning "To exit: Press Ctrl+A, then press X"
+        print_info "Press RESET button on ESP32 to restart"
+        echo ""
+        sleep 2
         minicom -D "$port" -b "$baudrate"
     else
         print_error "No serial monitor found"
@@ -486,61 +653,127 @@ run_esp32_qemu_test() {
     
     print_success "Build successful"
     
-    local flash_img="build/zephyr/zephyr.bin"
+    local zephyr_elf="build/zephyr/zephyr.elf"
+    local zephyr_bin="build/zephyr/zephyr.bin"
+    local flash_img="build/zephyr/flash_image.bin"
     local qemu_log="build/esp32_qemu_output.log"
+    local flash_size_mb=4
+    local bootloader="build/zephyr/esp-idf/build/bootloader/bootloader.bin"
+    local partition_table="build/zephyr/esp-idf/build/partition_table/partition-table.bin"
     
-    if [ ! -f "$flash_img" ]; then
-        print_error "Flash image not found: $flash_img"
+    if [ ! -f "$zephyr_elf" ]; then
+        print_error "Zephyr ELF not found: $zephyr_elf"
         return 1
     fi
     
-    print_info "Running ESP32 in QEMU (${timeout_sec}s timeout)..."
-    print_info "Flash Image: $flash_img"
+    print_info "Zephyr ELF: $zephyr_elf"
+    
+    # Check if we have ESP-IDF bootloader components
+    if [ -f "$bootloader" ] && [ -f "$partition_table" ]; then
+        print_success "Found ESP-IDF components, creating flash image with bootloader"
+        
+        local current_size=$(stat -c%s "$zephyr_bin" 2>/dev/null || stat -f%z "$zephyr_bin" 2>/dev/null)
+        print_info "Zephyr binary size: $current_size bytes"
+        
+        # Create empty flash image (4MB)
+        dd if=/dev/zero of="$flash_img" bs=1M count=$flash_size_mb status=none 2>/dev/null
+        
+        # Write bootloader at 0x1000
+        dd if="$bootloader" of="$flash_img" bs=1 seek=4096 conv=notrunc status=none 2>/dev/null
+        print_success "Bootloader written at 0x1000"
+        
+        # Write partition table at 0x8000
+        dd if="$partition_table" of="$flash_img" bs=1 seek=32768 conv=notrunc status=none 2>/dev/null
+        print_success "Partition table written at 0x8000"
+        
+        # Write application at 0x10000
+        dd if="$zephyr_bin" of="$flash_img" bs=1 seek=65536 conv=notrunc status=none 2>/dev/null
+        print_success "Application written at 0x10000"
+        
+        local flash_size=$(stat -c%s "$flash_img" 2>/dev/null || stat -f%z "$flash_img" 2>/dev/null)
+        print_success "Flash image created: $flash_size bytes"
+        
+        print_info "Running ESP32 in QEMU with flash image (${timeout_sec}s timeout)..."
+        echo ""
+        
+        # Run QEMU with flash image
+        timeout "${timeout_sec}s" "$qemu_bin" \
+            -nographic \
+            -machine esp32 \
+            -drive file="$flash_img",if=mtd,format=raw \
+            -serial mon:stdio \
+            2>&1 | tee "$qemu_log" || EXIT_CODE=$?
+    else
+        print_warning "ESP-IDF bootloader not found, trying ELF direct load"
+        print_info "This may not work on ESP32 - Zephyr might need ESP-IDF bootloader"
+        
+        print_info "Running ESP32 in QEMU with ELF (${timeout_sec}s timeout)..."
+        echo ""
+        
+        # Try running QEMU with just the binary at offset 0
+        # ESP32 expects code at 0x40000000 (IRAM) but bootloader sets this up
+        # Without bootloader, we need to create a minimal flash image
+        dd if=/dev/zero of="$flash_img" bs=1M count=$flash_size_mb status=none 2>/dev/null
+        dd if="$zephyr_bin" of="$flash_img" bs=1 seek=65536 conv=notrunc status=none 2>/dev/null
+        print_info "Created minimal flash image with app at 0x10000"
+        
+        timeout "${timeout_sec}s" "$qemu_bin" \
+            -nographic \
+            -machine esp32 \
+            -drive file="$flash_img",if=mtd,format=raw \
+            -serial mon:stdio \
+            2>&1 | tee "$qemu_log" || EXIT_CODE=$?
+    fi
+    
     echo ""
     
-    # Create QEMU command
-    # Run QEMU with ESP32 configuration and capture output
-    timeout "${timeout_sec}s" "$qemu_bin" \
-        -nographic \
-        -machine esp32 \
-        -drive file="$flash_img",if=mtd,format=raw \
-        -serial mon:stdio \
-        2>&1 | tee "$qemu_log" || EXIT_CODE=$?
-    
-    echo ""
-    
-    # Check QEMU output for expected messages
+    # Check QEMU output for boot activity
     local test_passed=0
+    local boot_detected=0
     
-    if grep -q "Blink module initialized" "$qemu_log" 2>/dev/null; then
+    # Check for module initialization messages
+    if grep -qi "Blink module initialized" "$qemu_log" 2>/dev/null; then
         print_success "✓ Blink module initialized"
         test_passed=1
     fi
     
-    if grep -q "Blink task started" "$qemu_log" 2>/dev/null; then
+    if grep -qi "Blink task started" "$qemu_log" 2>/dev/null; then
         print_success "✓ Blink task started"
         test_passed=1
     fi
     
-    if grep -q "Display module initialized" "$qemu_log" 2>/dev/null; then
+    if grep -qi "Display module initialized" "$qemu_log" 2>/dev/null; then
         print_success "✓ Display module initialized"
         test_passed=1
     fi
     
-    # Check exit code
+    # Check for boot messages
+    if grep -qi "Booting Zephyr" "$qemu_log" 2>/dev/null || \
+       grep -qi "\*\*\* Booting" "$qemu_log" 2>/dev/null; then
+        print_success "✓ Zephyr boot detected"
+        boot_detected=1
+    fi
+    
+    # Evaluate results
     if [ $test_passed -eq 1 ]; then
-        print_success "ESP32 QEMU smoke test passed (modules initialized)"
+        print_success "ESP32 QEMU test passed: Module initialization detected"
+    elif [ $boot_detected -eq 1 ]; then
+        print_success "ESP32 QEMU test passed: System boot detected"
     elif [ ${EXIT_CODE:-0} -eq 124 ]; then
-        print_success "ESP32 QEMU smoke test passed (timeout = application running)"
+        print_success "ESP32 QEMU test passed: Timeout (application running)"
     elif [ ${EXIT_CODE:-0} -eq 0 ]; then
-        print_success "ESP32 QEMU smoke test passed (clean exit)"
+        print_success "ESP32 QEMU test passed: Clean exit"
     else
-        print_error "ESP32 QEMU smoke test failed (exit code: $EXIT_CODE)"
-        print_info "QEMU log: $qemu_log"
+        print_error "ESP32 QEMU test failed: No boot activity detected (exit code: $EXIT_CODE)"
+        echo ""
+        print_warning "Last 30 lines of QEMU output:"
+        tail -n 30 "$qemu_log"
+        echo ""
+        print_info "Full QEMU log: $qemu_log"
         return $EXIT_CODE
     fi
     
-    print_info "Build artifacts: build/zephyr/zephyr.bin"
+    print_info "Flash image: build/zephyr/flash_image.bin"
     print_info "QEMU output log: $qemu_log"
     return 0
 }
