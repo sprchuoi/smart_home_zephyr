@@ -41,6 +41,7 @@ show_usage() {
     echo "Options:"
     echo "  --board <name>     Specify board (default: esp32_devkitc_wroom)"
     echo "  --port <device>    Specify serial port (default: auto-detect)"
+    echo "  --                 Pass additional arguments to west build"
     echo ""
     echo "Examples:"
     echo "  ./make.sh setup              # First time setup"
@@ -53,6 +54,8 @@ show_usage() {
     echo "  ./make.sh docs               # Build documentation"
     echo "  ./make.sh monitor            # Monitor serial output"
     echo "  ./make.sh build --board esp32_devkitc"
+    echo "  ./make.sh build -- -DEXTRA_CONF_FILE=app/wifi_config.conf"
+    echo "  ./make.sh build -- -DCONF_FILE=voice.conf"
     echo ""
 }
 
@@ -63,6 +66,7 @@ shift || true
 # Parse options
 BOARD="esp32_devkitc"
 PORT=""
+BUILD_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -73,6 +77,11 @@ while [[ $# -gt 0 ]]; do
         --port)
             PORT="$2"
             shift 2
+            ;;
+        --)
+            shift
+            BUILD_ARGS=("$@")
+            break
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
@@ -92,7 +101,7 @@ case $COMMAND in
     build)
         print_header "Building Application"
         check_environment
-        build_project "$BOARD"
+        build_project "$BOARD" "${BUILD_ARGS[@]}"
         ;;
     
     clean)
@@ -119,7 +128,7 @@ case $COMMAND in
     all)
         print_header "Build and Flash"
         check_environment
-        build_project "$BOARD"
+        build_project "$BOARD" "${BUILD_ARGS[@]}"
         flash_firmware "$PORT"
         echo ""
         echo -e "${GREEN}Done! Run './make.sh monitor' to see output${NC}"

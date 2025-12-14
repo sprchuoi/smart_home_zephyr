@@ -131,50 +131,66 @@ static void Os_Start(void)
 {
 	int ret;
 	
+	printk("\n*** Starting all tasks ***\n");
+	LOG_INF("Starting all tasks");
+	
 	// Zephyr OS starts its own scheduler automatically.
 	// Start task threads
 	ret = blink_task_start();
 	if (ret < 0) {
 		LOG_ERR("Failed to start blink task (%d)", ret);
+		printk("FAILED to start blink task: %d\n", ret);
 		return;
 	}
+	printk("Blink task created\n");
 
 	ret = sensor_task_start();
 	if (ret < 0) {
 		LOG_ERR("Failed to start sensor task (%d)", ret);
+		printk("FAILED to start sensor task: %d\n", ret);
 		return;
 	}
+	printk("Sensor task created\n");
 
 #if defined(CONFIG_BT)
 	ret = ble_task_start();
 	if (ret < 0) {
 		LOG_ERR("Failed to start BLE task (%d)", ret);
+		printk("FAILED to start BLE task: %d\n", ret);
 		return;
 	}
+	printk("BLE task created\n");
 #endif
 
 #if defined(CONFIG_WIFI)
 	ret = wifi_task_start();
 	if (ret < 0) {
 		LOG_ERR("Failed to start WiFi task (%d)", ret);
+		printk("FAILED to start WiFi task: %d\n", ret);
 		return;
 	}
+	printk("WiFi task created\n");
 #endif
 
 	ret = display_task_start();
 	if (ret < 0) {
 		LOG_ERR("Failed to start display task (%d)", ret);
+		printk("FAILED to start display task: %d\n", ret);
 		return;
 	}
+	printk("Display task created\n");
 
 	ret = uart_task_start();
 	if (ret < 0) {
 		LOG_ERR("Failed to start UART task (%d)", ret);
+		printk("FAILED to start UART task: %d\n", ret);
 		return;
 	}
+	printk("UART task created\n");
 	
 
 	LOG_INF("All tasks started successfully");
+	printk("*** All tasks started successfully ***\n\n");
 }
 
 

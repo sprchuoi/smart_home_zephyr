@@ -162,6 +162,8 @@ check_environment() {
 # Build project
 build_project() {
     local board="$1"
+    shift
+    local build_args=("$@")
     
     if [ ! -f "app/CMakeLists.txt" ]; then
         print_error "Must run from software/ directory"
@@ -175,12 +177,18 @@ build_project() {
     fi
     
     print_info "Application: app/"
+    
+    # Show additional build arguments if provided
+    if [ ${#build_args[@]} -gt 0 ]; then
+        print_info "Extra arguments: ${build_args[*]}"
+    fi
+    
     echo ""
     
     print_info "Building application..."
     
-    # Try west build
-    if west build -b "$board" app; then
+    # Try west build with additional arguments
+    if west build -b "$board" app "${build_args[@]}"; then
         echo ""
         print_header "Build Complete"
         print_success "Binary: build/zephyr/zephyr.bin"

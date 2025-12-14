@@ -143,4 +143,19 @@ config WIFI_AP_PASSWORD
 	help
 	  WiFi access point password (minimum 8 characters).
 
+config WIFI_CHANNEL
+	int "WiFi channel hint (0 = scan all channels)"
+	default 0
+	range 0 13
+	help
+	  If you know which channel your WiFi router uses, set it here
+	  to speed up connection (skips scanning other channels).
+	  Set to 0 to scan all channels (slower but more reliable).
+	  Common channels: 1, 6, 11 (non-overlapping in 2.4GHz).
+	  
+	  To find your router's channel:
+	  - Windows: netsh wlan show networks mode=bssid
+	  - Linux: iwlist scan | grep Channel
+	  - Router admin page: Look for "Wireless Channel"
+
 endmenu

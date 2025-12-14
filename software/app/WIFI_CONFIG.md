@@ -13,13 +13,40 @@
    CONFIG_WIFI_PASSWORD="YourPassword"
    CONFIG_WIFI_AP_SSID="ESP32_SmartHome"
    CONFIG_WIFI_AP_PASSWORD="12345678"
+   
+   # Optional: Specify WiFi channel for faster connection (0 = scan all)
+   CONFIG_WIFI_CHANNEL=6
    ```
 
 3. **Build with your configuration:**
    ```bash
    cd ~/sandboxes/example-application/software
-   ./make.sh build -- -DCONF_FILE=prj.conf -DEXTRA_CONF_FILE=app/wifi_config.conf
+   ./make.sh build -- -DEXTRA_CONF_FILE=app/wifi_config.conf
    ```
+
+## Speed Optimization
+
+### Channel Hint (Recommended)
+Setting the WiFi channel can reduce connection time from 8-12 seconds to 3-5 seconds by skipping channel scanning.
+
+**Find your router's channel:**
+- **Windows:** `netsh wlan show networks mode=bssid` (look for "Channel")
+- **Linux/Mac:** `iwlist wlan0 scan | grep Channel` or use WiFi Analyzer app
+- **Router:** Check admin page → Wireless Settings → Channel
+
+**Add to wifi_config.conf:**
+```conf
+CONFIG_WIFI_CHANNEL=6  # Replace 6 with your router's channel
+```
+
+Common 2.4GHz channels: 1, 6, 11 (non-overlapping)
+
+### Other Optimizations
+The firmware includes:
+- **Reduced initialization delay**: 500ms instead of 2s
+- **Connection timeout**: 15s (was infinite)
+- **Delayed AP mode**: Starts AP after station connects (faster boot)
+- **Smart reconnection**: 60s backoff with state tracking
 
 ## Security Notes
 

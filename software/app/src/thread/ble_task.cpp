@@ -28,6 +28,7 @@ static void ble_task_entry(void *arg1, void *arg2, void *arg3)
 	BleService& ble = BleService::getInstance();
 
 	LOG_INF("BLE task started");
+	printk("*** BLE TASK STARTED ***\n");
 
 	/* Wait for BLE to be fully initialized */
 	k_sleep(K_MSEC(500));
@@ -36,21 +37,32 @@ static void ble_task_entry(void *arg1, void *arg2, void *arg3)
 	err = ble.startAdvertising();
 	if (err) {
 		LOG_ERR("Failed to start advertising (err %d) - will retry", err);
+		printk("BLE advertising failed: %d\n", err);
 		/* Don't return, retry later */
+	} else {
+		LOG_INF("BLE advertising started successfully");
+		printk("BLE advertising started\n");
 	}
 
 	/* Periodically send "Hello World" notifications */
 	while (1) {
+		// Log every 10 seconds to show task is alive
+		if (count % 10 == 0) {
+			LOG_INF("BLE task alive (count: %u, connected: %d)", 
+			        count, ble.isConnected());
+		}
+		
 		if (ble.isConnected() && ble.isNotifyEnabled()) {
 			char msg[20];
-			snprintf(msg, sizeof(msg), "Hello World %u", count++);
+			snprintf(msg, sizeof(msg), "Hello World %u", count);
 			
 			err = ble.notify(msg);
 			if (err == 0) {
 				LOG_INF("Sent: %s", msg);
 			}
 		}
-
+		
+		count++;
 		k_sleep(K_MSEC(BLE_NOTIFY_INTERVAL_MS));
 	}
 }

@@ -24,9 +24,17 @@ static void blink_task_entry(void *arg1, void *arg2, void *arg3)
 
 	BlinkModule& blink = BlinkModule::getInstance();
 	LOG_INF("Blink task started");
+	printk("*** BLINK TASK STARTED ***\n");
 
+	uint32_t loop_count = 0;
 	while (1) {
 		blink.tick();
+		loop_count++;
+		
+		// Log every 10 blinks to show task is alive
+		if (loop_count % 10 == 0) {
+			LOG_INF("Blink task alive (count: %u)", loop_count);
+		}
 	}
 }
 
