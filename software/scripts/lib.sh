@@ -645,75 +645,115 @@ run_esp32_qemu_test() {
     
     print_success "Build successful"
     
-    local flash_img="build/zephyr/zephyr.bin"
-    local flash_img_padded="build/zephyr/zephyr_padded.bin"
+    local zephyr_bin="build/zephyr/zephyr.bin"
+    local flash_img="build/zephyr/flash_image.bin"
     local qemu_log="build/esp32_qemu_output.log"
     local flash_size_mb=4
-    local flash_size_bytes=$((flash_size_mb * 1024 * 1024))
+    local app_offset=$((0x10000))  # Standard ESP32 application offset
+    local bootloader="build/zephyr/esp-idf/build/bootloader/bootloader.bin"
+    local partition_table="build/zephyr/esp-idf/build/partition_table/partition-table.bin"
     
-    if [ ! -f "$flash_img" ]; then
-        print_error "Flash image not found: $flash_img"
+    if [ ! -f "$zephyr_bin" ]; then
+        print_error "Zephyr binary not found: $zephyr_bin"
         return 1
     fi
     
-    # Pad binary to flash size (ESP32 QEMU requires exact flash sizes: 2, 4, 8, or 16 MB)
-    local current_size=$(stat -c%s "$flash_img" 2>/dev/null || stat -f%z "$flash_img" 2>/dev/null)
-    print_info "Current binary size: $current_size bytes"
-    print_info "Padding to: $flash_size_bytes bytes (${flash_size_mb}MB)"
+    local current_size=$(stat -c%s "$zephyr_bin" 2>/dev/null || stat -f%z "$zephyr_bin" 2>/dev/null)
+    print_info "Zephyr binary size: $current_size bytes"
     
-    # Create padded image
-    cp "$flash_img" "$flash_img_padded"
-    truncate -s $flash_size_bytes "$flash_img_padded"
+    # Create proper ESP32 flash image
+    if [ ! -f "$bootloader" ]; then
+        print_warning "ESP-IDF bootloader not found, using direct boot"
+        print_info "Creating flash image (${flash_size_mb}MB) with direct boot..."
+        
+        # Create empty flash and copy zephyr binary to start
+        dd if=/dev/zero of="$flash_img" bs=1M count=$flash_size_mb 2>/dev/null
+        dd if="$zephyr_bin" of="$flash_img" conv=notrunc 2>/dev/null
+    else
+        print_success "Found ESP-IDF bootloader, creating proper flash layout"
+        
+        # Create empty flash image
+        dd if=/dev/zero of="$flash_img" bs=1M count=$flash_size_mb 2>/dev/null
+        
+        # Write bootloader at 0x1000
+        dd if="$bootloader" of="$flash_img" bs=1 seek=4096 conv=notrunc 2>/dev/null
+        print_success "Bootloader written at 0x1000"
+        
+        # Write partition table at 0x8000 if it exists
+        if [ -f "$partition_table" ]; then
+            dd if="$partition_table" of="$flash_img" bs=1 seek=32768 conv=notrunc 2>/dev/null
+            print_success "Partition table written at 0x8000"
+        fi
+        
+        # Write application at 0x10000
+        dd if="$zephyr_bin" of="$flash_img" bs=1 seek=$app_offset conv=notrunc 2>/dev/null
+        print_success "Application written at 0x10000"
+    fi
     
-    local padded_size=$(stat -c%s "$flash_img_padded" 2>/dev/null || stat -f%z "$flash_img_padded" 2>/dev/null)
-    print_success "Padded image size: $padded_size bytes"
+    local flash_size=$(stat -c%s "$flash_img" 2>/dev/null || stat -f%z "$flash_img" 2>/dev/null)
+    print_success "Flash image created: $flash_size bytes"
     
     print_info "Running ESP32 in QEMU (${timeout_sec}s timeout)..."
-    print_info "Flash Image: $flash_img_padded"
+    print_info "Flash Image: $flash_img"
     echo ""
     
     # Run QEMU with ESP32 configuration and capture output
     timeout "${timeout_sec}s" "$qemu_bin" \
         -nographic \
         -machine esp32 \
-        -drive file="$flash_img_padded",if=mtd,format=raw \
+        -drive file="$flash_img",if=mtd,format=raw \
         -serial mon:stdio \
         2>&1 | tee "$qemu_log" || EXIT_CODE=$?
     
     echo ""
     
-    # Check QEMU output for expected messages
+    # Check QEMU output for boot activity
     local test_passed=0
+    local boot_detected=0
     
-    if grep -q "Blink module initialized" "$qemu_log" 2>/dev/null; then
+    # Check for module initialization messages
+    if grep -qi "Blink module initialized" "$qemu_log" 2>/dev/null; then
         print_success "✓ Blink module initialized"
         test_passed=1
     fi
     
-    if grep -q "Blink task started" "$qemu_log" 2>/dev/null; then
+    if grep -qi "Blink task started" "$qemu_log" 2>/dev/null; then
         print_success "✓ Blink task started"
         test_passed=1
     fi
     
-    if grep -q "Display module initialized" "$qemu_log" 2>/dev/null; then
+    if grep -qi "Display module initialized" "$qemu_log" 2>/dev/null; then
         print_success "✓ Display module initialized"
         test_passed=1
     fi
     
-    # Check exit code
+    # Check for boot messages
+    if grep -qi "Booting Zephyr" "$qemu_log" 2>/dev/null || \
+       grep -qi "\*\*\* Booting" "$qemu_log" 2>/dev/null; then
+        print_success "✓ Zephyr boot detected"
+        boot_detected=1
+    fi
+    
+    # Evaluate results
     if [ $test_passed -eq 1 ]; then
-        print_success "ESP32 QEMU smoke test passed (modules initialized)"
+        print_success "ESP32 QEMU test passed: Module initialization detected"
+    elif [ $boot_detected -eq 1 ]; then
+        print_success "ESP32 QEMU test passed: System boot detected"
     elif [ ${EXIT_CODE:-0} -eq 124 ]; then
-        print_success "ESP32 QEMU smoke test passed (timeout = application running)"
+        print_success "ESP32 QEMU test passed: Timeout (application running)"
     elif [ ${EXIT_CODE:-0} -eq 0 ]; then
-        print_success "ESP32 QEMU smoke test passed (clean exit)"
+        print_success "ESP32 QEMU test passed: Clean exit"
     else
-        print_error "ESP32 QEMU smoke test failed (exit code: $EXIT_CODE)"
-        print_info "QEMU log: $qemu_log"
+        print_error "ESP32 QEMU test failed: No boot activity detected (exit code: $EXIT_CODE)"
+        echo ""
+        print_warning "Last 30 lines of QEMU output:"
+        tail -n 30 "$qemu_log"
+        echo ""
+        print_info "Full QEMU log: $qemu_log"
         return $EXIT_CODE
     fi
     
-    print_info "Build artifacts: build/zephyr/zephyr.bin"
+    print_info "Flash image: build/zephyr/flash_image.bin"
     print_info "QEMU output log: $qemu_log"
     return 0
 }

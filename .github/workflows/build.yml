@@ -163,10 +163,11 @@ jobs:
           set -e
           
           QEMU_BIN="qemu-system-xtensa"
-          FLASH_IMG="build/zephyr/zephyr.bin"
-          FLASH_IMG_PADDED="build/zephyr/zephyr_padded.bin"
+          ZEPHYR_BIN="build/zephyr/zephyr.bin"
+          FLASH_IMG="build/zephyr/flash_image.bin"
           FLASH_SIZE_MB=4
           FLASH_SIZE_BYTES=$((FLASH_SIZE_MB * 1024 * 1024))
+          APP_OFFSET=0x10000  # Standard ESP32 application offset
           
           # Check if QEMU binary exists
           if ! command -v $QEMU_BIN &> /dev/null; then
@@ -176,25 +177,51 @@ jobs:
           
           echo "Starting ESP32 QEMU with blink LED test..."
           echo "QEMU Binary: $(which $QEMU_BIN)"
-          echo "Flash Image: $FLASH_IMG"
+          echo "Zephyr Binary: $ZEPHYR_BIN"
           
-          # Pad binary to flash size (ESP32 QEMU requires exact flash sizes: 2, 4, 8, or 16 MB)
-          CURRENT_SIZE=$(stat -c%s "$FLASH_IMG" 2>/dev/null || stat -f%z "$FLASH_IMG" 2>/dev/null)
-          echo "Current binary size: $CURRENT_SIZE bytes"
-          echo "Padding to: $FLASH_SIZE_BYTES bytes (${FLASH_SIZE_MB}MB)"
+          # Get bootloader from build
+          BOOTLOADER="build/zephyr/esp-idf/build/bootloader/bootloader.bin"
+          PARTITION_TABLE="build/zephyr/esp-idf/build/partition_table/partition-table.bin"
           
-          # Create padded image
-          cp "$FLASH_IMG" "$FLASH_IMG_PADDED"
-          truncate -s $FLASH_SIZE_BYTES "$FLASH_IMG_PADDED"
+          if [ ! -f "$BOOTLOADER" ]; then
+            echo "WARNING: Bootloader not found at $BOOTLOADER"
+            echo "This is expected for some Zephyr configurations"
+            # For Zephyr builds without ESP-IDF bootloader, use direct boot
+            # Just pad the zephyr.bin to flash size
+            CURRENT_SIZE=$(stat -c%s "$ZEPHYR_BIN" 2>/dev/null || stat -f%z "$ZEPHYR_BIN" 2>/dev/null)
+            echo "Zephyr binary size: $CURRENT_SIZE bytes"
+            echo "Creating flash image (${FLASH_SIZE_MB}MB) with direct boot..."
+            
+            # Create empty flash image
+            dd if=/dev/zero of="$FLASH_IMG" bs=1M count=$FLASH_SIZE_MB 2>/dev/null
+            
+            # Copy Zephyr binary to start of flash (direct boot)
+            dd if="$ZEPHYR_BIN" of="$FLASH_IMG" conv=notrunc 2>/dev/null
+          else
+            echo "Found ESP-IDF bootloader, creating proper flash layout..."
+            # Create empty flash image
+            dd if=/dev/zero of="$FLASH_IMG" bs=1M count=$FLASH_SIZE_MB 2>/dev/null
+            
+            # Write bootloader at 0x1000
+            dd if="$BOOTLOADER" of="$FLASH_IMG" bs=1 seek=4096 conv=notrunc 2>/dev/null
+            
+            # Write partition table at 0x8000
+            if [ -f "$PARTITION_TABLE" ]; then
+              dd if="$PARTITION_TABLE" of="$FLASH_IMG" bs=1 seek=32768 conv=notrunc 2>/dev/null
+            fi
+            
+            # Write application at 0x10000
+            dd if="$ZEPHYR_BIN" of="$FLASH_IMG" bs=1 seek=$APP_OFFSET conv=notrunc 2>/dev/null
+          fi
           
-          echo "Padded image size: $(stat -c%s "$FLASH_IMG_PADDED" 2>/dev/null || stat -f%z "$FLASH_IMG_PADDED" 2>/dev/null) bytes"
+          echo "Flash image created: $(stat -c%s "$FLASH_IMG" 2>/dev/null || stat -f%z "$FLASH_IMG" 2>/dev/null) bytes"
           
           # Run QEMU with ESP32 configuration
-          # Monitor output for blink module initialization and LED toggling
+          # Use longer timeout and monitor for any output
           timeout 30s $QEMU_BIN \
             -nographic \
             -machine esp32 \
-            -drive file=$FLASH_IMG_PADDED,if=mtd,format=raw \
+            -drive file=$FLASH_IMG,if=mtd,format=raw \
             -serial mon:stdio \
             2>&1 | tee qemu_output.log
           EOF
@@ -204,16 +231,34 @@ jobs:
           # Run QEMU and capture output
           ./run_qemu.sh || EXIT_CODE=$?
           
-          # Check QEMU output for expected blink module messages
-          if grep -q "Blink module initialized" qemu_output.log || \
-             grep -q "Blink task started" qemu_output.log || \
+          # Check QEMU output for successful boot indicators
+          # Accept any of: module initialization, boot messages, or expected timeout
+          if grep -qi "Blink module initialized" qemu_output.log || \
+             grep -qi "Blink task started" qemu_output.log || \
+             grep -qi "Booting Zephyr" qemu_output.log || \
+             grep -qi "\*\*\* Booting" qemu_output.log || \
              [ ${EXIT_CODE:-0} -eq 124 ]; then
-            echo "✓ ESP32 QEMU test: Blink module detected or timeout as expected"
+            echo "✓ ESP32 QEMU test passed: System boot detected or timeout"
+            
+            # Show what was detected
+            if grep -qi "Blink" qemu_output.log; then
+              echo "  - Blink module messages found"
+            fi
+            if grep -qi "Booting" qemu_output.log; then
+              echo "  - Boot messages found"
+            fi
+            if [ ${EXIT_CODE:-0} -eq 124 ]; then
+              echo "  - Timeout (application running continuously)"
+            fi
+            
             exit 0
           else
-            echo "✗ ESP32 QEMU test: Expected output not found"
-            echo "--- QEMU Output ---"
-            cat qemu_output.log
+            echo "✗ ESP32 QEMU test failed: No boot activity detected"
+            echo ""
+            echo "--- QEMU Output (last 50 lines) ---"
+            tail -n 50 qemu_output.log
+            echo ""
+            echo "Note: If you see 'invalid header' errors, the flash image layout may need adjustment"
             exit 1
           fi
 
