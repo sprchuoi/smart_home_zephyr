@@ -205,14 +205,20 @@ jobs:
               -serial mon:stdio \
               2>&1 | tee qemu_output.log
           else
-            echo "No ESP-IDF bootloader found, using ELF direct load..."
+            echo "No ESP-IDF bootloader found, trying minimal flash layout..."
+            echo "This may not work - ESP32 typically needs bootloader"
             
-            # Run QEMU with ELF file (direct kernel load)
-            # This bypasses the bootloader and loads Zephyr directly
+            # Create minimal flash image with app at standard offset (0x10000)
+            FLASH_IMG="build/zephyr/flash_image.bin"
+            dd if=/dev/zero of="$FLASH_IMG" bs=1M count=4 status=none
+            dd if="$ZEPHYR_BIN" of="$FLASH_IMG" bs=1 seek=65536 conv=notrunc status=none
+            echo "Created minimal flash with app at 0x10000"
+            
+            # Run QEMU with flash image
             timeout 30s $QEMU_BIN \
               -nographic \
               -machine esp32 \
-              -kernel "$ZEPHYR_ELF" \
+              -drive file=$FLASH_IMG,if=mtd,format=raw \
               -serial mon:stdio \
               2>&1 | tee qemu_output.log
           fi
