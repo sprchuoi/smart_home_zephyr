@@ -16,6 +16,9 @@
 #if defined(CONFIG_WIFI)
 #include "modules/wifi/wifiservice.hpp"
 #endif
+#if defined(CONFIG_MQTT_LIB)
+#include "modules/mqtt/mqttmodule.hpp"
+#endif
 #include "modules/display/displaymodule.hpp"
 #include "modules/button/buttonmodule.hpp"
 #include "modules/uart/uartmodule.hpp"
@@ -98,6 +101,14 @@ static void Os_Init(void)
 	if (ret < 0) {
 		LOG_ERR("Failed to initialize WiFi service (%d)", ret);
 		return;
+	}
+#endif
+
+#if defined(CONFIG_MQTT_LIB)
+	// Initialize MQTT module (will connect after WiFi is ready)
+	ret = MQTTModule::getInstance().init();
+	if (ret < 0) {
+		LOG_WRN("Failed to initialize MQTT module (%d) - continuing without MQTT", ret);
 	}
 #endif
 

@@ -15,6 +15,10 @@
 #include <zephyr/posix/sys/socket.h>
 #include "wifi_task.h"
 #include "../modules/wifi/wifiservice.hpp"
+#if defined(CONFIG_MQTT_LIB)
+#include "../modules/mqtt/mqttmodule.hpp"
+#include <stdio.h>
+#endif
 
 LOG_MODULE_REGISTER(wifi_task, CONFIG_APP_LOG_LEVEL);
 
@@ -98,6 +102,78 @@ static int test_internet_connectivity(void)
 	}
 }
 
+#if defined(CONFIG_MQTT_LIB)
+/* Process MQTT to maintain connection and handle messages */
+static void mqtt_process(void)
+{
+	MQTTModule& mqtt = MQTTModule::getInstance();
+	if (mqtt.isConnected()) {
+		mqtt.live();
+	}
+}
+
+/* Publish device status to MQTT broker */
+static int publish_device_status(const char* status_msg)
+{
+	MQTTModule& mqtt = MQTTModule::getInstance();
+	
+	// Connect to MQTT broker if not already connected
+	if (!mqtt.isConnected()) {
+		LOG_INF("Connecting to MQTT broker...");
+		int ret = mqtt.connect();
+		if (ret < 0) {
+			LOG_ERR("Failed to connect to MQTT broker (%d)", ret);
+			return ret;
+		}
+	}
+	
+	// Get WiFi info
+	static char ip_str[NET_IPV4_ADDR_LEN] = "0.0.0.0";
+	const char* ip_addr = ip_str;
+	int rssi = -100;
+	
+	// Get IP address if available
+	struct net_if* iface = net_if_get_default();
+	if (iface) {
+		struct net_if_ipv4* ipv4 = iface->config.ip.ipv4;
+		if (ipv4) {
+			// Get first unicast address that is in use
+			for (int i = 0; i < NET_IF_MAX_IPV4_ADDR; i++) {
+				if (ipv4->unicast[i].ipv4.addr_state == NET_ADDR_PREFERRED) {
+					zsock_inet_ntop(AF_INET, &ipv4->unicast[i].ipv4.address.in_addr, 
+					               ip_str, sizeof(ip_str));
+					break;
+				}
+			}
+		}
+	}
+	
+	// Prepare status JSON payload matching server format
+	char payload[512];
+	snprintf(payload, sizeof(payload), 
+	         "{"
+	         "\"device_id\":\"esp32_001\","
+	         "\"device_type\":\"sensor\","
+	         "\"status\":\"%s\","
+	         "\"ip\":\"%s\","
+	         "\"rssi\":%d,"
+	         "\"timestamp\":%lld"
+	         "}",
+	         status_msg, ip_addr, rssi, k_uptime_get() / 1000);
+	
+	// Publish to status topic using server format
+	const char* topic = "smart_home/devices/esp32_001/status";
+	int ret = mqtt.publish(topic, (const uint8_t*)payload, strlen(payload), MQTT_QOS_1_AT_LEAST_ONCE);
+	if (ret < 0) {
+		LOG_ERR("Failed to publish status (%d)", ret);
+		return ret;
+	}
+	
+	LOG_INF("Published status to MQTT: %s", payload);
+	return 0;
+}
+#endif
+
 /* WiFi connection callback */
 static void wifi_connection_callback(bool connected)
 {
@@ -172,6 +248,13 @@ static void wifi_task_entry(void *arg1, void *arg2, void *arg3)
 		// Test internet connectivity
 		LOG_INF("Testing internet connectivity to 8.8.8.8...");
 		test_internet_connectivity();
+		
+#if defined(CONFIG_MQTT_LIB)
+		// Publish initial status to MQTT broker
+		LOG_INF("Publishing device status to MQTT broker...");
+		k_sleep(K_SECONDS(1)); // Brief delay to ensure network is fully ready
+		publish_device_status("connected");
+#endif
 	} else {
 		LOG_WRN("Initial WiFi connection failed or timed out");
 		
@@ -230,6 +313,11 @@ static void wifi_task_entry(void *arg1, void *arg2, void *arg3)
 				// Test connectivity after reconnection
 				k_sleep(K_SECONDS(2));
 				test_internet_connectivity();
+				
+#if defined(CONFIG_MQTT_LIB)
+				// Publish reconnection status to MQTT
+				publish_device_status("reconnected");
+#endif
 				seconds_since_ping = 0;
 			}
 			seconds_since_disconnect = 0;
@@ -241,6 +329,11 @@ static void wifi_task_entry(void *arg1, void *arg2, void *arg3)
 				test_internet_connectivity();
 				seconds_since_ping = 0;
 			}
+			
+#if defined(CONFIG_MQTT_LIB)
+			// Process MQTT to maintain connection
+			mqtt_process();
+#endif
 		}
 		
 		was_connected = currently_connected;

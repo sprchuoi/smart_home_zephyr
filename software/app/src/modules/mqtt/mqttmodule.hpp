@@ -71,6 +71,12 @@ public:
     int subscribe(const char* topic, MessageCallback callback);
     
     /**
+     * @brief Process MQTT messages and maintain connection
+     * Must be called periodically to handle keep-alive
+     */
+    void live();
+    
+    /**
      * @brief Check if connected to broker
      * @return true if connected
      */
@@ -95,12 +101,16 @@ private:
     Config config_;
     struct mqtt_client client_;
     struct sockaddr_storage broker_addr_;
+    int sock_fd_;
     
     bool connected_;
     MessageCallback message_callback_;
     
     uint8_t rx_buffer_[MAX_PAYLOAD_SIZE];
     uint8_t tx_buffer_[MAX_PAYLOAD_SIZE];
+    
+    struct mqtt_utf8 username_utf8_;
+    struct mqtt_utf8 password_utf8_;
     
     struct k_mutex mutex_;
     struct k_sem connected_sem_;

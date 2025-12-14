@@ -18,6 +18,7 @@ MQTTModule& MQTTModule::getInstance() {
 MQTTModule::MQTTModule()
     : connected_(false)
     , message_callback_(nullptr)
+    , sock_fd_(-1)
 {
     k_mutex_init(&mutex_);
     k_sem_init(&connected_sem_, 0, 1);
@@ -27,8 +28,9 @@ MQTTModule::MQTTModule()
 
 int MQTTModule::init() {
     // Default configuration
+    // MQTT Broker: 192.168.2.1:1883
     Config default_config = {
-        .broker_host = "192.168.1.100",
+        .broker_host = "192.168.2.1",
         .broker_port = DEFAULT_PORT,
         .client_id = "esp32_001",
         .username = "esp32_user",
@@ -60,9 +62,14 @@ int MQTTModule::init(const Config& config) {
     client_.client_id.size = strlen(config_.client_id);
     
     // Set credentials
-    if (config_.username) {
-        client_.user_name = (struct mqtt_utf8*)&config_.username;
-        client_.password = (struct mqtt_utf8*)&config_.password;
+    if (config_.username && config_.password) {
+        username_utf8_.utf8 = (uint8_t*)config_.username;
+        username_utf8_.size = strlen(config_.username);
+        password_utf8_.utf8 = (uint8_t*)config_.password;
+        password_utf8_.size = strlen(config_.password);
+        
+        client_.user_name = &username_utf8_;
+        client_.password = &password_utf8_;
     }
     
     // Set event handler
@@ -93,11 +100,14 @@ int MQTTModule::connect() {
     LOG_INF("Connecting to MQTT broker: %s:%d", 
             config_.broker_host, config_.broker_port);
     
+    // Small delay to ensure network stack is ready
+    k_sleep(K_MSEC(500));
+    
     // Resolve broker address
-    struct zsock_addrinfo hints = {
-        .ai_family = AF_INET,
-        .ai_socktype = SOCK_STREAM
-    };
+    struct zsock_addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
     
     struct zsock_addrinfo* addr_result;
     int ret = zsock_getaddrinfo(config_.broker_host, NULL, &hints, &addr_result);
@@ -114,19 +124,89 @@ int MQTTModule::connect() {
         ((struct sockaddr_in*)&broker_addr_)->sin_port = htons(config_.broker_port);
     }
     
-    // Create socket
-    client_.transport.type = MQTT_TRANSPORT_NON_SECURE;
+    LOG_DBG("Creating TCP socket...");
     
+    // Create socket
+    sock_fd_ = zsock_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock_fd_ < 0) {
+        LOG_ERR("Failed to create socket: errno=%d", errno);
+        return -errno;
+    }
+    
+    LOG_DBG("Socket created: fd=%d", sock_fd_);
+    
+    // Set socket timeout for connect operation
+    struct zsock_timeval timeout;
+    timeout.tv_sec = 10;  // 10 second timeout
+    timeout.tv_usec = 0;
+    ret = zsock_setsockopt(sock_fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    if (ret < 0) {
+        LOG_WRN("Failed to set send timeout: errno=%d", errno);
+    }
+    ret = zsock_setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    if (ret < 0) {
+        LOG_WRN("Failed to set receive timeout: errno=%d", errno);
+    }
+    
+    // Connect socket to broker
+    LOG_INF("Connecting socket to %s:%d...", config_.broker_host, config_.broker_port);
+    ret = zsock_connect(sock_fd_, (struct sockaddr*)&broker_addr_, sizeof(struct sockaddr_in));
+    if (ret < 0) {
+        LOG_ERR("Socket connect failed: errno=%d", errno);
+        zsock_close(sock_fd_);
+        sock_fd_ = -1;
+        return -errno;
+    }
+    
+    LOG_INF("Socket connected to broker");
+    
+    // Set up MQTT transport
+    client_.transport.type = MQTT_TRANSPORT_NON_SECURE;
+    client_.transport.tcp.sock = sock_fd_;
+    
+    // Set broker address in client
+    client_.broker = &broker_addr_;
+    
+    LOG_DBG("Initiating MQTT connection...");
+    
+    // Connect MQTT
     ret = mqtt_connect(&client_);
     if (ret != 0) {
         LOG_ERR("MQTT connect failed: %d", ret);
+        zsock_close(sock_fd_);
+        sock_fd_ = -1;
         return ret;
     }
     
-    // Wait for connection with timeout
-    ret = k_sem_take(&connected_sem_, K_SECONDS(10));
-    if (ret != 0) {
+    LOG_DBG("MQTT connect initiated, polling for CONNACK...");
+    
+    // Poll for CONNACK with timeout
+    int64_t timeout_time = k_uptime_get() + K_SECONDS(10).ticks;
+    while (k_uptime_get() < timeout_time) {
+        // Process MQTT input to get CONNACK
+        ret = mqtt_input(&client_);
+        if (ret != 0 && ret != -EAGAIN) {
+            LOG_ERR("MQTT input failed: %d", ret);
+            zsock_close(sock_fd_);
+            sock_fd_ = -1;
+            return ret;
+        }
+        
+        // Check if connected
+        if (k_sem_take(&connected_sem_, K_MSEC(100)) == 0) {
+            LOG_INF("MQTT CONNACK received");
+            break;
+        }
+        
+        // Keep connection alive
+        mqtt_live(&client_);
+    }
+    
+    // Final check if connected
+    if (!connected_) {
         LOG_ERR("MQTT connection timeout");
+        zsock_close(sock_fd_);
+        sock_fd_ = -1;
         return -ETIMEDOUT;
     }
     
@@ -139,10 +219,16 @@ int MQTTModule::disconnect() {
         return 0;
     }
     
-    int ret = mqtt_disconnect(&client_);
+    struct mqtt_disconnect_param param;
+    memset(&param, 0, sizeof(param));
+    int ret = mqtt_disconnect(&client_, &param);
     if (ret != 0) {
         LOG_ERR("MQTT disconnect failed: %d", ret);
-        return ret;
+    }
+    
+    if (sock_fd_ >= 0) {
+        zsock_close(sock_fd_);
+        sock_fd_ = -1;
     }
     
     connected_ = false;
@@ -155,16 +241,16 @@ int MQTTModule::publish(const char* topic, const uint8_t* payload, size_t len, u
         return -EINVAL;
     }
     
-    struct mqtt_publish_param param = {
-        .message.topic.qos = qos,
-        .message.topic.topic.utf8 = (uint8_t*)topic,
-        .message.topic.topic.size = strlen(topic),
-        .message.payload.data = (uint8_t*)payload,
-        .message.payload.len = len,
-        .message_id = 1,
-        .dup_flag = 0,
-        .retain_flag = 0,
-    };
+    struct mqtt_publish_param param;
+    memset(&param, 0, sizeof(param));
+    param.message.topic.qos = qos;
+    param.message.topic.topic.utf8 = (uint8_t*)topic;
+    param.message.topic.topic.size = strlen(topic);
+    param.message.payload.data = (uint8_t*)payload;
+    param.message.payload.len = len;
+    param.message_id = 1;
+    param.dup_flag = 0;
+    param.retain_flag = 0;
     
     int ret = mqtt_publish(&client_, &param);
     if (ret != 0) {
@@ -183,11 +269,11 @@ int MQTTModule::subscribe(const char* topic, MessageCallback callback) {
     
     message_callback_ = callback;
     
-    struct mqtt_topic subscribe_topic = {
-        .topic.utf8 = (uint8_t*)topic,
-        .topic.size = strlen(topic),
-        .qos = MQTT_QOS_1_AT_LEAST_ONCE
-    };
+    struct mqtt_topic subscribe_topic;
+    memset(&subscribe_topic, 0, sizeof(subscribe_topic));
+    subscribe_topic.topic.utf8 = (uint8_t*)topic;
+    subscribe_topic.topic.size = strlen(topic);
+    subscribe_topic.qos = MQTT_QOS_1_AT_LEAST_ONCE;
     
     struct mqtt_subscription_list sub_list = {
         .list = &subscribe_topic,
@@ -203,6 +289,28 @@ int MQTTModule::subscribe(const char* topic, MessageCallback callback) {
     
     LOG_INF("Subscribed to: %s", topic);
     return 0;
+}
+
+void MQTTModule::live() {
+    if (!connected_) {
+        return;
+    }
+    
+    // Process incoming messages
+    int ret = mqtt_input(&client_);
+    if (ret != 0 && ret != -EAGAIN) {
+        LOG_WRN("MQTT input error: %d", ret);
+    }
+    
+    // Send keep-alive if needed
+    ret = mqtt_live(&client_);
+    if (ret != 0 && ret != -EAGAIN) {
+        LOG_WRN("MQTT live error: %d", ret);
+        if (ret == -ENOTCONN) {
+            connected_ = false;
+            LOG_ERR("MQTT connection lost");
+        }
+    }
 }
 
 void MQTTModule::mqtt_event_handler(struct mqtt_client* client, const struct mqtt_evt* evt) {

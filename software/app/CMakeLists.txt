@@ -54,9 +54,15 @@ if(CONFIG_WIFI)
     )
 endif()
 
+# Conditionally compile MQTT module
+if(CONFIG_MQTT_LIB)
+    target_sources(app PRIVATE
+        src/modules/mqtt/mqttmodule.cpp
+    )
+endif()
+
 # Add voice control modules subdirectories
 add_subdirectory_ifdef(CONFIG_I2S src/modules/i2s_mic)
-add_subdirectory_ifdef(CONFIG_MQTT_LIB src/modules/mqtt)
 add_subdirectory_ifdef(CONFIG_BOOTLOADER_MCUBOOT src/modules/ota)
 add_subdirectory(src/modules/wakeword)
 
