@@ -645,65 +645,71 @@ run_esp32_qemu_test() {
     
     print_success "Build successful"
     
+    local zephyr_elf="build/zephyr/zephyr.elf"
     local zephyr_bin="build/zephyr/zephyr.bin"
     local flash_img="build/zephyr/flash_image.bin"
     local qemu_log="build/esp32_qemu_output.log"
     local flash_size_mb=4
-    local app_offset=$((0x10000))  # Standard ESP32 application offset
     local bootloader="build/zephyr/esp-idf/build/bootloader/bootloader.bin"
     local partition_table="build/zephyr/esp-idf/build/partition_table/partition-table.bin"
     
-    if [ ! -f "$zephyr_bin" ]; then
-        print_error "Zephyr binary not found: $zephyr_bin"
+    if [ ! -f "$zephyr_elf" ]; then
+        print_error "Zephyr ELF not found: $zephyr_elf"
         return 1
     fi
     
-    local current_size=$(stat -c%s "$zephyr_bin" 2>/dev/null || stat -f%z "$zephyr_bin" 2>/dev/null)
-    print_info "Zephyr binary size: $current_size bytes"
+    print_info "Zephyr ELF: $zephyr_elf"
     
-    # Create proper ESP32 flash image
-    if [ ! -f "$bootloader" ]; then
-        print_warning "ESP-IDF bootloader not found, using direct boot"
-        print_info "Creating flash image (${flash_size_mb}MB) with direct boot..."
+    # Check if we have ESP-IDF bootloader components
+    if [ -f "$bootloader" ] && [ -f "$partition_table" ]; then
+        print_success "Found ESP-IDF components, creating flash image with bootloader"
         
-        # Create empty flash and copy zephyr binary to start
-        dd if=/dev/zero of="$flash_img" bs=1M count=$flash_size_mb 2>/dev/null
-        dd if="$zephyr_bin" of="$flash_img" conv=notrunc 2>/dev/null
-    else
-        print_success "Found ESP-IDF bootloader, creating proper flash layout"
+        local current_size=$(stat -c%s "$zephyr_bin" 2>/dev/null || stat -f%z "$zephyr_bin" 2>/dev/null)
+        print_info "Zephyr binary size: $current_size bytes"
         
-        # Create empty flash image
-        dd if=/dev/zero of="$flash_img" bs=1M count=$flash_size_mb 2>/dev/null
+        # Create empty flash image (4MB)
+        dd if=/dev/zero of="$flash_img" bs=1M count=$flash_size_mb status=none 2>/dev/null
         
         # Write bootloader at 0x1000
-        dd if="$bootloader" of="$flash_img" bs=1 seek=4096 conv=notrunc 2>/dev/null
+        dd if="$bootloader" of="$flash_img" bs=1 seek=4096 conv=notrunc status=none 2>/dev/null
         print_success "Bootloader written at 0x1000"
         
-        # Write partition table at 0x8000 if it exists
-        if [ -f "$partition_table" ]; then
-            dd if="$partition_table" of="$flash_img" bs=1 seek=32768 conv=notrunc 2>/dev/null
-            print_success "Partition table written at 0x8000"
-        fi
+        # Write partition table at 0x8000
+        dd if="$partition_table" of="$flash_img" bs=1 seek=32768 conv=notrunc status=none 2>/dev/null
+        print_success "Partition table written at 0x8000"
         
         # Write application at 0x10000
-        dd if="$zephyr_bin" of="$flash_img" bs=1 seek=$app_offset conv=notrunc 2>/dev/null
+        dd if="$zephyr_bin" of="$flash_img" bs=1 seek=65536 conv=notrunc status=none 2>/dev/null
         print_success "Application written at 0x10000"
+        
+        local flash_size=$(stat -c%s "$flash_img" 2>/dev/null || stat -f%z "$flash_img" 2>/dev/null)
+        print_success "Flash image created: $flash_size bytes"
+        
+        print_info "Running ESP32 in QEMU with flash image (${timeout_sec}s timeout)..."
+        echo ""
+        
+        # Run QEMU with flash image
+        timeout "${timeout_sec}s" "$qemu_bin" \
+            -nographic \
+            -machine esp32 \
+            -drive file="$flash_img",if=mtd,format=raw \
+            -serial mon:stdio \
+            2>&1 | tee "$qemu_log" || EXIT_CODE=$?
+    else
+        print_warning "ESP-IDF bootloader not found, using ELF direct load"
+        print_info "This bypasses the bootloader and loads Zephyr directly"
+        
+        print_info "Running ESP32 in QEMU with ELF (${timeout_sec}s timeout)..."
+        echo ""
+        
+        # Run QEMU with ELF file (direct kernel load)
+        timeout "${timeout_sec}s" "$qemu_bin" \
+            -nographic \
+            -machine esp32 \
+            -kernel "$zephyr_elf" \
+            -serial mon:stdio \
+            2>&1 | tee "$qemu_log" || EXIT_CODE=$?
     fi
-    
-    local flash_size=$(stat -c%s "$flash_img" 2>/dev/null || stat -f%z "$flash_img" 2>/dev/null)
-    print_success "Flash image created: $flash_size bytes"
-    
-    print_info "Running ESP32 in QEMU (${timeout_sec}s timeout)..."
-    print_info "Flash Image: $flash_img"
-    echo ""
-    
-    # Run QEMU with ESP32 configuration and capture output
-    timeout "${timeout_sec}s" "$qemu_bin" \
-        -nographic \
-        -machine esp32 \
-        -drive file="$flash_img",if=mtd,format=raw \
-        -serial mon:stdio \
-        2>&1 | tee "$qemu_log" || EXIT_CODE=$?
     
     echo ""
     

@@ -163,11 +163,7 @@ jobs:
           set -e
           
           QEMU_BIN="qemu-system-xtensa"
-          ZEPHYR_BIN="build/zephyr/zephyr.bin"
-          FLASH_IMG="build/zephyr/flash_image.bin"
-          FLASH_SIZE_MB=4
-          FLASH_SIZE_BYTES=$((FLASH_SIZE_MB * 1024 * 1024))
-          APP_OFFSET=0x10000  # Standard ESP32 application offset
+          ZEPHYR_ELF="build/zephyr/zephyr.elf"
           
           # Check if QEMU binary exists
           if ! command -v $QEMU_BIN &> /dev/null; then
@@ -175,55 +171,51 @@ jobs:
             exit 1
           fi
           
-          echo "Starting ESP32 QEMU with blink LED test..."
-          echo "QEMU Binary: $(which $QEMU_BIN)"
-          echo "Zephyr Binary: $ZEPHYR_BIN"
-          
-          # Get bootloader from build
-          BOOTLOADER="build/zephyr/esp-idf/build/bootloader/bootloader.bin"
-          PARTITION_TABLE="build/zephyr/esp-idf/build/partition_table/partition-table.bin"
-          
-          if [ ! -f "$BOOTLOADER" ]; then
-            echo "WARNING: Bootloader not found at $BOOTLOADER"
-            echo "This is expected for some Zephyr configurations"
-            # For Zephyr builds without ESP-IDF bootloader, use direct boot
-            # Just pad the zephyr.bin to flash size
-            CURRENT_SIZE=$(stat -c%s "$ZEPHYR_BIN" 2>/dev/null || stat -f%z "$ZEPHYR_BIN" 2>/dev/null)
-            echo "Zephyr binary size: $CURRENT_SIZE bytes"
-            echo "Creating flash image (${FLASH_SIZE_MB}MB) with direct boot..."
-            
-            # Create empty flash image
-            dd if=/dev/zero of="$FLASH_IMG" bs=1M count=$FLASH_SIZE_MB 2>/dev/null
-            
-            # Copy Zephyr binary to start of flash (direct boot)
-            dd if="$ZEPHYR_BIN" of="$FLASH_IMG" conv=notrunc 2>/dev/null
-          else
-            echo "Found ESP-IDF bootloader, creating proper flash layout..."
-            # Create empty flash image
-            dd if=/dev/zero of="$FLASH_IMG" bs=1M count=$FLASH_SIZE_MB 2>/dev/null
-            
-            # Write bootloader at 0x1000
-            dd if="$BOOTLOADER" of="$FLASH_IMG" bs=1 seek=4096 conv=notrunc 2>/dev/null
-            
-            # Write partition table at 0x8000
-            if [ -f "$PARTITION_TABLE" ]; then
-              dd if="$PARTITION_TABLE" of="$FLASH_IMG" bs=1 seek=32768 conv=notrunc 2>/dev/null
-            fi
-            
-            # Write application at 0x10000
-            dd if="$ZEPHYR_BIN" of="$FLASH_IMG" bs=1 seek=$APP_OFFSET conv=notrunc 2>/dev/null
+          if [ ! -f "$ZEPHYR_ELF" ]; then
+            echo "ERROR: Zephyr ELF not found: $ZEPHYR_ELF"
+            exit 1
           fi
           
-          echo "Flash image created: $(stat -c%s "$FLASH_IMG" 2>/dev/null || stat -f%z "$FLASH_IMG" 2>/dev/null) bytes"
+          echo "Starting ESP32 QEMU with blink LED test..."
+          echo "QEMU Binary: $(which $QEMU_BIN)"
+          echo "Zephyr ELF: $ZEPHYR_ELF"
           
-          # Run QEMU with ESP32 configuration
-          # Use longer timeout and monitor for any output
-          timeout 30s $QEMU_BIN \
-            -nographic \
-            -machine esp32 \
-            -drive file=$FLASH_IMG,if=mtd,format=raw \
-            -serial mon:stdio \
-            2>&1 | tee qemu_output.log
+          # Check if we have ESP-IDF bootloader/partition files
+          BOOTLOADER="build/zephyr/esp-idf/build/bootloader/bootloader.bin"
+          PARTITION_TABLE="build/zephyr/esp-idf/build/partition_table/partition-table.bin"
+          ZEPHYR_BIN="build/zephyr/zephyr.bin"
+          
+          if [ -f "$BOOTLOADER" ] && [ -f "$PARTITION_TABLE" ]; then
+            echo "Found ESP-IDF components, creating flash image..."
+            FLASH_IMG="build/zephyr/flash_image.bin"
+            
+            # Create 4MB flash image with proper layout
+            dd if=/dev/zero of="$FLASH_IMG" bs=1M count=4 status=none
+            dd if="$BOOTLOADER" of="$FLASH_IMG" bs=1 seek=4096 conv=notrunc status=none
+            dd if="$PARTITION_TABLE" of="$FLASH_IMG" bs=1 seek=32768 conv=notrunc status=none
+            dd if="$ZEPHYR_BIN" of="$FLASH_IMG" bs=1 seek=65536 conv=notrunc status=none
+            
+            echo "Flash image created with bootloader layout"
+            
+            # Run QEMU with flash image
+            timeout 30s $QEMU_BIN \
+              -nographic \
+              -machine esp32 \
+              -drive file=$FLASH_IMG,if=mtd,format=raw \
+              -serial mon:stdio \
+              2>&1 | tee qemu_output.log
+          else
+            echo "No ESP-IDF bootloader found, using ELF direct load..."
+            
+            # Run QEMU with ELF file (direct kernel load)
+            # This bypasses the bootloader and loads Zephyr directly
+            timeout 30s $QEMU_BIN \
+              -nographic \
+              -machine esp32 \
+              -kernel "$ZEPHYR_ELF" \
+              -serial mon:stdio \
+              2>&1 | tee qemu_output.log
+          fi
           EOF
           
           chmod +x run_qemu.sh
