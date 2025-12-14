@@ -646,23 +646,37 @@ run_esp32_qemu_test() {
     print_success "Build successful"
     
     local flash_img="build/zephyr/zephyr.bin"
+    local flash_img_padded="build/zephyr/zephyr_padded.bin"
     local qemu_log="build/esp32_qemu_output.log"
+    local flash_size_mb=4
+    local flash_size_bytes=$((flash_size_mb * 1024 * 1024))
     
     if [ ! -f "$flash_img" ]; then
         print_error "Flash image not found: $flash_img"
         return 1
     fi
     
+    # Pad binary to flash size (ESP32 QEMU requires exact flash sizes: 2, 4, 8, or 16 MB)
+    local current_size=$(stat -c%s "$flash_img" 2>/dev/null || stat -f%z "$flash_img" 2>/dev/null)
+    print_info "Current binary size: $current_size bytes"
+    print_info "Padding to: $flash_size_bytes bytes (${flash_size_mb}MB)"
+    
+    # Create padded image
+    cp "$flash_img" "$flash_img_padded"
+    truncate -s $flash_size_bytes "$flash_img_padded"
+    
+    local padded_size=$(stat -c%s "$flash_img_padded" 2>/dev/null || stat -f%z "$flash_img_padded" 2>/dev/null)
+    print_success "Padded image size: $padded_size bytes"
+    
     print_info "Running ESP32 in QEMU (${timeout_sec}s timeout)..."
-    print_info "Flash Image: $flash_img"
+    print_info "Flash Image: $flash_img_padded"
     echo ""
     
-    # Create QEMU command
     # Run QEMU with ESP32 configuration and capture output
     timeout "${timeout_sec}s" "$qemu_bin" \
         -nographic \
         -machine esp32 \
-        -drive file="$flash_img",if=mtd,format=raw \
+        -drive file="$flash_img_padded",if=mtd,format=raw \
         -serial mon:stdio \
         2>&1 | tee "$qemu_log" || EXIT_CODE=$?
     

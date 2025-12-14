@@ -164,7 +164,9 @@ jobs:
           
           QEMU_BIN="qemu-system-xtensa"
           FLASH_IMG="build/zephyr/zephyr.bin"
-          FLASH_SIZE="4MB"
+          FLASH_IMG_PADDED="build/zephyr/zephyr_padded.bin"
+          FLASH_SIZE_MB=4
+          FLASH_SIZE_BYTES=$((FLASH_SIZE_MB * 1024 * 1024))
           
           # Check if QEMU binary exists
           if ! command -v $QEMU_BIN &> /dev/null; then
@@ -176,12 +178,23 @@ jobs:
           echo "QEMU Binary: $(which $QEMU_BIN)"
           echo "Flash Image: $FLASH_IMG"
           
+          # Pad binary to flash size (ESP32 QEMU requires exact flash sizes: 2, 4, 8, or 16 MB)
+          CURRENT_SIZE=$(stat -c%s "$FLASH_IMG" 2>/dev/null || stat -f%z "$FLASH_IMG" 2>/dev/null)
+          echo "Current binary size: $CURRENT_SIZE bytes"
+          echo "Padding to: $FLASH_SIZE_BYTES bytes (${FLASH_SIZE_MB}MB)"
+          
+          # Create padded image
+          cp "$FLASH_IMG" "$FLASH_IMG_PADDED"
+          truncate -s $FLASH_SIZE_BYTES "$FLASH_IMG_PADDED"
+          
+          echo "Padded image size: $(stat -c%s "$FLASH_IMG_PADDED" 2>/dev/null || stat -f%z "$FLASH_IMG_PADDED" 2>/dev/null) bytes"
+          
           # Run QEMU with ESP32 configuration
           # Monitor output for blink module initialization and LED toggling
           timeout 30s $QEMU_BIN \
             -nographic \
             -machine esp32 \
-            -drive file=$FLASH_IMG,if=mtd,format=raw \
+            -drive file=$FLASH_IMG_PADDED,if=mtd,format=raw \
             -serial mon:stdio \
             2>&1 | tee qemu_output.log
           EOF
