@@ -1,0 +1,10 @@
+# MQTT Configuration
+# Copy this file to mqtt_config.conf and set your credentials
+# mqtt_config.conf is gitignored and won't be committed
+
+CONFIG_MQTT_BROKER_HOSTNAME="192.168.2.1"
+CONFIG_MQTT_BROKER_PORT=1883
+CONFIG_MQTT_CLIENT_ID="esp32_001"
+CONFIG_MQTT_USERNAME="esp32_user"
+CONFIG_MQTT_PASSWORD="password"
+

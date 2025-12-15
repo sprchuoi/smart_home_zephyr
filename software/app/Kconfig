@@ -159,3 +159,49 @@ config WIFI_CHANNEL
 	  - Router admin page: Look for "Wireless Channel"
 
 endmenu
+
+menu "MQTT Configuration"
+
+config MQTT_BROKER_HOSTNAME
+	string "MQTT broker hostname or IP address"
+	default "192.168.2.1"
+	help
+	  MQTT broker hostname or IP address to connect to.
+	  Override in mqtt_config.conf (gitignored).
+
+config MQTT_BROKER_PORT
+	int "MQTT broker port"
+	default 1883
+	range 1 65535
+	help
+	  MQTT broker TCP port (typically 1883 for non-TLS, 8883 for TLS).
+
+config MQTT_CLIENT_ID
+	string "MQTT client ID"
+	default "esp32_001"
+	help
+	  Unique client identifier for MQTT connection.
+	  Override in mqtt_config.conf (gitignored).
+
+config MQTT_USERNAME
+	string "MQTT username"
+	default "esp32_user"
+	help
+	  MQTT broker authentication username.
+	  Override in mqtt_config.conf (gitignored).
+
+config MQTT_PASSWORD
+	string "MQTT password"
+	default "password"
+	help
+	  MQTT broker authentication password.
+	  Override in mqtt_config.conf (gitignored).
+
+config MQTT_DEVICE_ID
+	string "Device ID for MQTT topics"
+	default "esp32_001"
+	help
+	  Device identifier used in MQTT topic names.
+	  Example: smart_home/devices/{device_id}/status
+
+endmenu

@@ -6,6 +6,8 @@
 #include "mqttmodule.hpp"
 #include <zephyr/logging/log.h>
 #include <zephyr/net/dns_resolve.h>
+#include <zephyr/posix/fcntl.h>
+#include <zephyr/posix/unistd.h>
 #include <string.h>
 
 LOG_MODULE_REGISTER(mqtt_module, CONFIG_APP_LOG_LEVEL);
@@ -30,12 +32,12 @@ int MQTTModule::init() {
     // Default configuration
     // MQTT Broker: 192.168.2.1:1883
     Config default_config = {
-        .broker_host = "192.168.2.1",
-        .broker_port = DEFAULT_PORT,
-        .client_id = "esp32_001",
-        .username = "esp32_user",
-        .password = "password",
-        .device_id = "esp32_001"
+        .broker_host = CONFIG_MQTT_BROKER_HOSTNAME,
+        .broker_port = CONFIG_MQTT_BROKER_PORT,
+        .client_id = CONFIG_MQTT_CLIENT_ID,
+        .username = CONFIG_MQTT_USERNAME,
+        .password = CONFIG_MQTT_PASSWORD,
+        .device_id = CONFIG_MQTT_CLIENT_ID
     };
     
     return init(default_config);
@@ -135,27 +137,64 @@ int MQTTModule::connect() {
     
     LOG_DBG("Socket created: fd=%d", sock_fd_);
     
-    // Set socket timeout for connect operation
-    struct zsock_timeval timeout;
-    timeout.tv_sec = 10;  // 10 second timeout
-    timeout.tv_usec = 0;
-    ret = zsock_setsockopt(sock_fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-    if (ret < 0) {
-        LOG_WRN("Failed to set send timeout: errno=%d", errno);
-    }
-    ret = zsock_setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    if (ret < 0) {
-        LOG_WRN("Failed to set receive timeout: errno=%d", errno);
+    // Set socket to non-blocking mode for faster connection attempts
+    int flags = zsock_fcntl(sock_fd_, F_GETFL, 0);
+    if (flags < 0) {
+        LOG_WRN("Failed to get socket flags");
+    } else {
+        ret = zsock_fcntl(sock_fd_, F_SETFL, flags | O_NONBLOCK);
+        if (ret < 0) {
+            LOG_WRN("Failed to set non-blocking mode");
+        }
     }
     
-    // Connect socket to broker
+    // Connect socket to broker (non-blocking)
     LOG_INF("Connecting socket to %s:%d...", config_.broker_host, config_.broker_port);
     ret = zsock_connect(sock_fd_, (struct sockaddr*)&broker_addr_, sizeof(struct sockaddr_in));
-    if (ret < 0) {
+    
+    if (ret < 0 && errno != EINPROGRESS) {
         LOG_ERR("Socket connect failed: errno=%d", errno);
         zsock_close(sock_fd_);
         sock_fd_ = -1;
         return -errno;
+    }
+    
+    // Wait for connection to complete with poll (1 second timeout)
+    if (errno == EINPROGRESS) {
+        struct zsock_pollfd fds[1];
+        fds[0].fd = sock_fd_;
+        fds[0].events = ZSOCK_POLLOUT;
+        fds[0].revents = 0;
+        
+        ret = zsock_poll(fds, 1, 1000);  // 1 second timeout
+        if (ret < 0) {
+            LOG_ERR("Poll failed: errno=%d", errno);
+            zsock_close(sock_fd_);
+            sock_fd_ = -1;
+            return -errno;
+        } else if (ret == 0) {
+            LOG_ERR("Connection timeout");
+            zsock_close(sock_fd_);
+            sock_fd_ = -1;
+            return -ETIMEDOUT;
+        }
+        
+        // Check if connection succeeded
+        int error = 0;
+        socklen_t len = sizeof(error);
+        ret = zsock_getsockopt(sock_fd_, SOL_SOCKET, SO_ERROR, &error, &len);
+        if (ret < 0 || error != 0) {
+            LOG_ERR("Connection failed: %d", error ? error : errno);
+            zsock_close(sock_fd_);
+            sock_fd_ = -1;
+            return error ? -error : -errno;
+        }
+    }
+    
+    // Set back to blocking mode for MQTT operations
+    flags = zsock_fcntl(sock_fd_, F_GETFL, 0);
+    if (flags >= 0) {
+        zsock_fcntl(sock_fd_, F_SETFL, flags & ~O_NONBLOCK);
     }
     
     LOG_INF("Socket connected to broker");

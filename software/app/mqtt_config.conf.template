@@ -1,0 +1,20 @@
+# MQTT Configuration Template
+# Copy this file to mqtt_config.conf and update with your actual credentials
+# mqtt_config.conf is gitignored for security
+
+# MQTT Broker Settings
+CONFIG_MQTT_BROKER_HOSTNAME="192.168.2.1"
+CONFIG_MQTT_BROKER_PORT=1883
+
+# MQTT Authentication
+CONFIG_MQTT_CLIENT_ID="esp32_001"
+CONFIG_MQTT_USERNAME="esp32_user"
+CONFIG_MQTT_PASSWORD="YourSecurePassword"
+
+# Device Identification
+CONFIG_MQTT_DEVICE_ID="esp32_001"
+
+# Usage:
+# 1. Copy this template: cp mqtt_config.conf.template mqtt_config.conf
+# 2. Edit mqtt_config.conf with your actual broker credentials
+# 3. Build with: ./make.sh build -- -DEXTRA_CONF_FILE="app/wifi_config.conf;app/mqtt_config.conf"

@@ -16,7 +16,7 @@
 #include "wifi_task.h"
 #include "../modules/wifi/wifiservice.hpp"
 #if defined(CONFIG_MQTT_LIB)
-#include "../modules/mqtt/mqttmodule.hpp"
+#include "mqtt_task.h"
 #include <stdio.h>
 #endif
 
@@ -103,29 +103,9 @@ static int test_internet_connectivity(void)
 }
 
 #if defined(CONFIG_MQTT_LIB)
-/* Process MQTT to maintain connection and handle messages */
-static void mqtt_process(void)
-{
-	MQTTModule& mqtt = MQTTModule::getInstance();
-	if (mqtt.isConnected()) {
-		mqtt.live();
-	}
-}
-
-/* Publish device status to MQTT broker */
+/* Publish device status to MQTT broker using IPC */
 static int publish_device_status(const char* status_msg)
 {
-	MQTTModule& mqtt = MQTTModule::getInstance();
-	
-	// Connect to MQTT broker if not already connected
-	if (!mqtt.isConnected()) {
-		LOG_INF("Connecting to MQTT broker...");
-		int ret = mqtt.connect();
-		if (ret < 0) {
-			LOG_ERR("Failed to connect to MQTT broker (%d)", ret);
-			return ret;
-		}
-	}
 	
 	// Get WiFi info
 	static char ip_str[NET_IPV4_ADDR_LEN] = "0.0.0.0";
@@ -152,24 +132,36 @@ static int publish_device_status(const char* status_msg)
 	char payload[512];
 	snprintf(payload, sizeof(payload), 
 	         "{"
-	         "\"device_id\":\"esp32_001\","
+	         "\"device_id\":\"%s\","
 	         "\"device_type\":\"sensor\","
 	         "\"status\":\"%s\","
 	         "\"ip\":\"%s\","
 	         "\"rssi\":%d,"
 	         "\"timestamp\":%lld"
 	         "}",
+#ifdef CONFIG_MQTT_DEVICE_ID
+	         CONFIG_MQTT_DEVICE_ID,
+#else
+	         "esp32_001",
+#endif
 	         status_msg, ip_addr, rssi, k_uptime_get() / 1000);
 	
-	// Publish to status topic using server format
-	const char* topic = "smart_home/devices/esp32_001/status";
-	int ret = mqtt.publish(topic, (const uint8_t*)payload, strlen(payload), MQTT_QOS_1_AT_LEAST_ONCE);
+	// Publish to status topic using IPC message queue
+	char topic[128];
+	snprintf(topic, sizeof(topic), "smart_home/devices/%s/status",
+#ifdef CONFIG_MQTT_DEVICE_ID																																																																																																																																																																																																																																																																																														
+	         CONFIG_MQTT_DEVICE_ID
+#else
+	         "esp32_001"
+#endif
+	);
+	int ret = mqtt_task_publish(topic, (const uint8_t*)payload, strlen(payload), 1 /* QoS 1 */);
 	if (ret < 0) {
-		LOG_ERR("Failed to publish status (%d)", ret);
+		LOG_ERR("Failed to queue MQTT publish (%d)", ret);
 		return ret;
 	}
 	
-	LOG_INF("Published status to MQTT: %s", payload);
+	LOG_DBG("Queued status publish to MQTT: %s", payload);
 	return 0;
 }
 #endif
@@ -329,11 +321,6 @@ static void wifi_task_entry(void *arg1, void *arg2, void *arg3)
 				test_internet_connectivity();
 				seconds_since_ping = 0;
 			}
-			
-#if defined(CONFIG_MQTT_LIB)
-			// Process MQTT to maintain connection
-			mqtt_process();
-#endif
 		}
 		
 		was_connected = currently_connected;

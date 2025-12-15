@@ -16,9 +16,6 @@
 #if defined(CONFIG_WIFI)
 #include "modules/wifi/wifiservice.hpp"
 #endif
-#if defined(CONFIG_MQTT_LIB)
-#include "modules/mqtt/mqttmodule.hpp"
-#endif
 #include "modules/display/displaymodule.hpp"
 #include "modules/button/buttonmodule.hpp"
 #include "modules/uart/uartmodule.hpp"
@@ -35,6 +32,9 @@
 #endif
 #if defined(CONFIG_WIFI)
 #include "thread/wifi_task.h"
+#endif
+#if defined(CONFIG_MQTT_LIB)
+#include "thread/mqtt_task.h"
 #endif
 #include "thread/display_task.h"
 #include "thread/uart_task.h"
@@ -104,14 +104,6 @@ static void Os_Init(void)
 	}
 #endif
 
-#if defined(CONFIG_MQTT_LIB)
-	// Initialize MQTT module (will connect after WiFi is ready)
-	ret = MQTTModule::getInstance().init();
-	if (ret < 0) {
-		LOG_WRN("Failed to initialize MQTT module (%d) - continuing without MQTT", ret);
-	}
-#endif
-
 	ret = DisplayModule::getInstance().init();
 	if (ret < 0) {
 		LOG_ERR("Failed to initialize display module (%d)", ret);
@@ -147,21 +139,21 @@ static void Os_Start(void)
 	
 	// Zephyr OS starts its own scheduler automatically.
 	// Start task threads
-	ret = blink_task_start();
-	if (ret < 0) {
-		LOG_ERR("Failed to start blink task (%d)", ret);
-		printk("FAILED to start blink task: %d\n", ret);
-		return;
-	}
-	printk("Blink task created\n");
+	// ret = blink_task_start();
+	// if (ret < 0) {
+	// 	LOG_ERR("Failed to start blink task (%d)", ret);
+	// 	printk("FAILED to start blink task: %d\n", ret);
+	// 	return;
+	// }
+	// printk("Blink task created\n");
 
-	ret = sensor_task_start();
-	if (ret < 0) {
-		LOG_ERR("Failed to start sensor task (%d)", ret);
-		printk("FAILED to start sensor task: %d\n", ret);
-		return;
-	}
-	printk("Sensor task created\n");
+	// ret = sensor_task_start();
+	// if (ret < 0) {
+	// 	LOG_ERR("Failed to start sensor task (%d)", ret);
+	// 	printk("FAILED to start sensor task: %d\n", ret);
+	// 	return;
+	// }
+	// printk("Sensor task created\n");
 
 #if defined(CONFIG_BT)
 	ret = ble_task_start();
@@ -183,20 +175,30 @@ static void Os_Start(void)
 	printk("WiFi task created\n");
 #endif
 
-	ret = display_task_start();
+#if defined(CONFIG_MQTT_LIB)
+	ret = mqtt_task_start();
 	if (ret < 0) {
-		LOG_ERR("Failed to start display task (%d)", ret);
-		printk("FAILED to start display task: %d\n", ret);
+		LOG_ERR("Failed to start MQTT task (%d)", ret);
+		printk("FAILED to start MQTT task: %d\n", ret);
 		return;
 	}
-	printk("Display task created\n");
+	printk("MQTT task created\n");
+#endif
 
-	ret = uart_task_start();
-	if (ret < 0) {
-		LOG_ERR("Failed to start UART task (%d)", ret);
-		printk("FAILED to start UART task: %d\n", ret);
-		return;
-	}
+	// ret = display_task_start();
+	// if (ret < 0) {
+	// 	LOG_ERR("Failed to start display task (%d)", ret);
+	// 	printk("FAILED to start display task: %d\n", ret);
+	// 	return;
+	// }
+	// printk("Display task created\n");
+
+	// ret = uart_task_start();
+	// if (ret < 0) {
+	// 	LOG_ERR("Failed to start UART task (%d)", ret);
+	// 	printk("FAILED to start UART task: %d\n", ret);
+	// 	return;
+	// }
 	printk("UART task created\n");
 	
 

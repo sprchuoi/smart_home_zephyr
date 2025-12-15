@@ -58,6 +58,7 @@ endif()
 if(CONFIG_MQTT_LIB)
     target_sources(app PRIVATE
         src/modules/mqtt/mqttmodule.cpp
+        src/thread/mqtt_task.cpp
     )
 endif()
 
