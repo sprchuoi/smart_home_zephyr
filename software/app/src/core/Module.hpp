@@ -43,6 +43,15 @@ public:
     virtual const char* getName() const = 0;
     
 protected:
+
+    enum class ModuleState {
+        UNINITIALIZED,
+        INITIALIZED,
+        RUNNING,
+        STOPPED
+    };
+
+    
     Module() = default;
     
     // Prevent copying

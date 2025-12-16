@@ -32,6 +32,15 @@ public:
     virtual int process() { return 0; }
     
 protected:
+
+    enum class ServiceState {
+        STOPPED,
+        STARTING,
+        RUNNING,
+        STOPPING
+    };
+
+    
     Service() : running_(false) {}
     
     bool running_;
