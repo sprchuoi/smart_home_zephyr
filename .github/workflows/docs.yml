@@ -28,6 +28,7 @@ jobs:
           tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz
           echo "${PWD}/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
           pip install -r software/doc/requirements.txt
+          pip install sphinx-rtd-theme
 
       - name: Build
         run: |
@@ -36,7 +37,7 @@ jobs:
 
           SPHINXOPTS="-W" make html
 
-          mkdir deploy
+          mkdir -p deploy
           mv _build_doxygen/html deploy/doxygen
           mv _build_sphinx/html/* deploy
 

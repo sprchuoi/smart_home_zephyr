@@ -1,7 +1,11 @@
-Welcome to Smart Home Application's documentation!
-=======================================================
+nRF5340 DK Matter Smart Light Documentation
+============================================
 
-This is a simple Sphinx documentation setup for ``smart-home-application``.
+Matter-enabled smart lighting system running on Nordic nRF5340 DK with dual-core architecture.
+
+**Hardware:** Nordic nRF5340 DK (dual-core ARM Cortex-M33)
+**Platform:** Zephyr RTOS with Matter SDK
+**Features:** 4 independent LEDs with button control, Matter protocol support
 
 .. toctree::
    :maxdepth: 2

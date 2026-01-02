@@ -16,8 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04]
-        # ESP32 builds require xtensa toolchain, limiting to Linux for simplicity
-        # Add macos-13, macos-14, windows-2022 when cross-platform support is needed
+        # nRF5340 builds use ARM toolchain, cross-platform support possible
+        # Add macos-13, macos-14, windows-2022 when needed
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -48,7 +48,6 @@ jobs:
           
           # Install Python dependencies
           pip3 install -r zephyr/scripts/requirements.txt
-          pip3 install "esptool>=5.0.2"
           
       - name: Install Zephyr SDK
         shell: bash
@@ -56,7 +55,7 @@ jobs:
           wget -q https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.17.4/zephyr-sdk-0.17.4_linux-x86_64_minimal.tar.xz
           tar xf zephyr-sdk-0.17.4_linux-x86_64_minimal.tar.xz
           cd zephyr-sdk-0.17.4
-          ./setup.sh -t xtensa-espressif_esp32_zephyr-elf -t arm-zephyr-eabi -h -c
+          ./setup.sh -t arm-zephyr-eabi -h -c
 
       - name: Build firmware
         shell: bash
@@ -64,14 +63,11 @@ jobs:
           # Set Zephyr environment
           cd smart_home_zephyr
           export ZEPHYR_BASE=$PWD/zephyr
-          export PATH=$HOME/zephyr-sdk-0.17.4/xtensa-espressif_esp32_zephyr-elf/bin:$PATH
+          export PATH=$HOME/zephyr-sdk-0.17.4/arm-zephyr-eabi/bin:$PATH
           
-          # Fetch ESP32 HAL blobs
-          west blobs fetch hal_espressif
-          
-          # Build for ESP32
+          # Build for nRF5340 DK (APP core)
           cd software
-          west build -b esp32_devkitc/esp32/procpu app
+          west build -b nrf5340dk/nrf5340/cpuapp app
 
       - name: Twister Tests
         shell: bash
@@ -260,14 +256,14 @@ jobs:
       #       exit 1
       #     fi
 
-      - name: Archive ESP32 QEMU artifacts
+      - name: Archive nRF5340 build artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: esp32-qemu-test-build
+          name: nrf5340-build-${{ matrix.os }}
           path: |
-            smart_home_zephyr/software/build/zephyr/zephyr.bin
+            smart_home_zephyr/software/build/zephyr/zephyr.hex
             smart_home_zephyr/software/build/zephyr/zephyr.elf
             smart_home_zephyr/software/build/zephyr/zephyr.map
             smart_home_zephyr/software/build/zephyr/.config
-            smart_home_zephyr/software/qemu_output.log
+            smart_home_zephyr/software/build/zephyr/merged.hex

@@ -372,13 +372,13 @@ open_monitor() {
     if command_exists screen; then
         print_warning "To exit: Press Ctrl+A, then type ':quit' and press Enter"
         print_warning "Or: Press Ctrl+A, then press '\\' (backslash), then press 'y'"
-        print_info "Press RESET button on ESP32 to restart"
+        print_info "Press RESET button on nRF5340 DK to restart"
         echo ""
         sleep 2
         screen "$port" "$baudrate"
     elif command_exists minicom; then
         print_warning "To exit: Press Ctrl+A, then press X"
-        print_info "Press RESET button on ESP32 to restart"
+        print_info "Press RESET button on nRF5340 DK to restart"
         echo ""
         sleep 2
         minicom -D "$port" -b "$baudrate"

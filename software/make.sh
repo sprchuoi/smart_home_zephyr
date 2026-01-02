@@ -110,11 +110,6 @@ case $COMMAND in
         clean_build
         ;;
     
-    attach)
-        print_header "Attach ESP32 to WSL"
-        attach_esp32
-        ;;
-    
     flash)
         print_header "Flashing Firmware"
         check_environment

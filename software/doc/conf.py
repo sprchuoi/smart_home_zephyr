@@ -6,25 +6,58 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Example Application'
-copyright = '2024, The Zephyr Community'
-author = 'The Zephyr Community'
+project = 'nRF5340 DK Matter Smart Light'
+copyright = '2024-2026, Smart Home Project'
+author = 'Smart Home Development Team'
 release = '1.0.0'
+version = '1.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.intersphinx']
+extensions = [
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.todo',
+    'sphinx.ext.viewcode',
+]
 
 templates_path = ['_templates']
-exclude_patterns = ['_build_sphinx', 'Thumbs.db', '.DS_Store']
+
+# Exclude patterns - do not include README, CI/CD, or build artifacts
+exclude_patterns = [
+    '_build', 
+    '_build_sphinx', 
+    'Thumbs.db', 
+    '.DS_Store',
+    'README.md',
+    'README.rst',
+    '../.github/**',
+    '../.gitlab-ci.yml',
+    '**/.git/**',
+    '**/node_modules/**',
+    '**/build/**',
+    '**/build_app/**',
+    '**/build_net/**',
+]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'alabaster'
+html_theme = 'sphinx_rtd_theme'
+html_static_path = ['_static']
+
+html_theme_options = {
+    'navigation_depth': 4,
+    'collapse_navigation': False,
+    'sticky_navigation': True,
+    'titles_only': False,
+}
 
 # -- Options for Intersphinx -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html
 
-intersphinx_mapping = {'zephyr': ('https://docs.zephyrproject.org/latest/', None)}
+intersphinx_mapping = {
+    'zephyr': ('https://docs.zephyrproject.org/latest/', None),
+    'matter': ('https://project-chip.github.io/connectedhomeip-doc/', None),
+}
