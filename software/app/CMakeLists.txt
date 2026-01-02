@@ -66,10 +66,25 @@ if(CONFIG_SOC_NRF5340_CPUNET)
     )
 endif()
 
+<<<<<<< HEAD
 #===============================================================================
 # INCLUDE DIRECTORIES - Source Tree Organization
 #===============================================================================
 # Make headers available throughout the project
+=======
+# Conditionally compile MQTT module
+if(CONFIG_MQTT_LIB)
+    target_sources(app PRIVATE
+        src/modules/mqtt/mqttmodule.cpp
+    )
+endif()
+
+# Add voice control modules subdirectories
+add_subdirectory_ifdef(CONFIG_I2S src/modules/i2s_mic)
+add_subdirectory_ifdef(CONFIG_BOOTLOADER_MCUBOOT src/modules/ota)
+add_subdirectory(src/modules/wakeword)
+
+>>>>>>> 354cd1bf46f83aa850e755a6466a6f8cc01279d8
 target_include_directories(app PRIVATE 
     src                              # Core source files
     src/modules                      # Module headers (matter, button, uart)

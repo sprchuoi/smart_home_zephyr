@@ -31,17 +31,28 @@ show_usage() {
     echo -e "  ${YELLOW}build-app${NC}   Build APP core only (Matter stack)"
     echo -e "  ${YELLOW}build-net${NC}   Build NET core only (OpenThread stack)"
     echo -e "  ${YELLOW}clean${NC}      Clean build artifacts"
+<<<<<<< HEAD
     echo -e "  ${YELLOW}flash${NC}      Flash both cores to nRF5340 DK"
     echo -e "  ${YELLOW}monitor${NC}    Open serial monitor (debug UART)"
     echo -e "  ${YELLOW}all${NC}        Build and flash both cores"
+=======
+    echo -e "  ${YELLOW}attach${NC}     Attach ESP32 USB device to WSL and optionally flash"
+    echo -e "  ${YELLOW}flash${NC}      Flash firmware to ESP32"
+    echo -e "  ${YELLOW}monitor${NC}    Open serial monitor"
+    echo -e "  ${YELLOW}all${NC}        Build and flash"
+    echo -e "  ${YELLOW}qemu${NC}       Build and run in QEMU (ARM smoke test)"
+    echo -e "  ${YELLOW}qemu-esp32${NC} Build and run in ESP32 QEMU (blink test)"
+>>>>>>> 354cd1bf46f83aa850e755a6466a6f8cc01279d8
     echo -e "  ${YELLOW}docs${NC}       Build documentation (Sphinx)"
     echo -e "  ${YELLOW}help${NC}       Show this help message"
     echo ""
     echo "Options:"
     echo "  --port <device>    Specify serial port (default: auto-detect)"
+    echo "  --                 Pass additional arguments to west build"
     echo ""
     echo "Examples:"
     echo "  ./make.sh setup              # First time setup"
+<<<<<<< HEAD
     echo "  ./make.sh build              # Build both APP and NET cores"
     echo "  ./make.sh build-app          # Build Matter stack only"
     echo "  ./make.sh build-net          # Build OpenThread stack only"
@@ -49,6 +60,19 @@ show_usage() {
     echo "  ./make.sh all                # Build and flash both cores"
     echo "  ./make.sh monitor            # Monitor serial output"
     echo "  ./make.sh docs               # Build documentation"
+=======
+    echo "  ./make.sh build              # Build firmware"
+    echo "  ./make.sh attach             # Attach ESP32 to WSL (interactive)"
+    echo "  ./make.sh flash              # Flash to ESP32"
+    echo "  ./make.sh all                # Build and flash"
+    echo "  ./make.sh qemu               # Run ARM smoke test in QEMU"
+    echo "  ./make.sh qemu-esp32         # Run ESP32 blink test in QEMU"
+    echo "  ./make.sh docs               # Build documentation"
+    echo "  ./make.sh monitor            # Monitor serial output"
+    echo "  ./make.sh build --board esp32_devkitc"
+    echo "  ./make.sh build -- -DEXTRA_CONF_FILE=app/wifi_config.conf"
+    echo "  ./make.sh build -- -DCONF_FILE=voice.conf"
+>>>>>>> 354cd1bf46f83aa850e755a6466a6f8cc01279d8
     echo ""
 }
 
@@ -58,12 +82,18 @@ shift || true
 
 # Parse options
 PORT=""
+BUILD_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --port)
             PORT="$2"
             shift 2
+            ;;
+        --)
+            shift
+            BUILD_ARGS=("$@")
+            break
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
@@ -83,6 +113,7 @@ case $COMMAND in
     build)
         print_header "Building Dual-Core Firmware"
         check_environment
+<<<<<<< HEAD
         build_dual_core
         ;;
     
@@ -96,11 +127,19 @@ case $COMMAND in
         print_header "Building NET Core (OpenThread Stack)"
         check_environment
         build_net_core
+=======
+        build_project "$BOARD" "${BUILD_ARGS[@]}"
+>>>>>>> 354cd1bf46f83aa850e755a6466a6f8cc01279d8
         ;;
     
     clean)
         print_header "Cleaning Build"
         clean_build
+        ;;
+    
+    attach)
+        print_header "Attach ESP32 to WSL"
+        attach_esp32
         ;;
     
     flash)
@@ -117,7 +156,11 @@ case $COMMAND in
     all)
         print_header "Build and Flash Both Cores"
         check_environment
+<<<<<<< HEAD
         build_dual_core
+=======
+        build_project "$BOARD" "${BUILD_ARGS[@]}"
+>>>>>>> 354cd1bf46f83aa850e755a6466a6f8cc01279d8
         flash_firmware "$PORT"
         echo ""
         echo -e "${GREEN}Done! Run './make.sh monitor' to see output${NC}"

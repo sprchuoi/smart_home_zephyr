@@ -38,6 +38,57 @@ config APP_WAKEWORD
 	help
 	  Enable local wake-word detection for voice activation.
 
+if APP_WAKEWORD
+
+choice APP_WAKEWORD_MODEL_TYPE
+	prompt "Wake-word model type"
+	default APP_WAKEWORD_MODEL_EDGE_IMPULSE
+	help
+	  Select the type of model to use for wake-word detection.
+
+config APP_WAKEWORD_MODEL_EDGE_IMPULSE
+	bool "Edge Impulse model"
+	help
+	  Use an Edge Impulse trained model (TensorFlow Lite for Microcontrollers).
+
+config APP_WAKEWORD_MODEL_CUSTOM
+	bool "Custom model"
+	help
+	  Use a custom model format.
+
+config APP_WAKEWORD_MODEL_PLACEHOLDER
+	bool "Placeholder (energy-based detection)"
+	help
+	  Use simple energy-based detection for testing without a real model.
+
+endchoice
+
+config APP_WAKEWORD_MODEL_FILE
+	string "Model file path"
+	default "wakeword_model.tflite"
+	depends on APP_WAKEWORD_MODEL_EDGE_IMPULSE || APP_WAKEWORD_MODEL_CUSTOM
+	help
+	  Path to the model file (relative to project root or absolute).
+	  For Edge Impulse, this should be a .tflite file.
+
+config APP_WAKEWORD_MODEL_EMBEDDED
+	bool "Embed model in binary"
+	default y
+	depends on APP_WAKEWORD_MODEL_EDGE_IMPULSE || APP_WAKEWORD_MODEL_CUSTOM
+	help
+	  Embed the model data directly in the firmware binary.
+	  If disabled, model will be loaded from external storage.
+
+config APP_WAKEWORD_ARENA_SIZE
+	int "TensorFlow Lite arena size (bytes)"
+	default 8192
+	depends on APP_WAKEWORD_MODEL_EDGE_IMPULSE
+	help
+	  Memory arena size for TensorFlow Lite Micro operations.
+	  Adjust based on model complexity.
+
+endif # APP_WAKEWORD
+
 config APP_MQTT
 	bool "Enable MQTT client"
 	depends on APP_VOICE_CONTROL
@@ -61,5 +112,50 @@ config APP_VERSION
 	default "1.0.0"
 	help
 	  Semantic version string for the application.
+
+endmenu
+
+menu "WiFi Configuration"
+
+config WIFI_SSID
+	string "WiFi SSID for station mode"
+	default "ESP32_Network"
+	help
+	  WiFi network SSID to connect to in station mode.
+	  Override in wifi_config.conf (gitignored).
+
+config WIFI_PASSWORD
+	string "WiFi password for station mode"
+	default "password123"
+	help
+	  WiFi network password for station mode.
+	  Override in wifi_config.conf (gitignored).
+
+config WIFI_AP_SSID
+	string "WiFi SSID for AP mode"
+	default "ESP32_SmartHome"
+	help
+	  WiFi access point SSID when running in AP mode.
+
+config WIFI_AP_PASSWORD
+	string "WiFi password for AP mode"
+	default "12345678"
+	help
+	  WiFi access point password (minimum 8 characters).
+
+config WIFI_CHANNEL
+	int "WiFi channel hint (0 = scan all channels)"
+	default 0
+	range 0 13
+	help
+	  If you know which channel your WiFi router uses, set it here
+	  to speed up connection (skips scanning other channels).
+	  Set to 0 to scan all channels (slower but more reliable).
+	  Common channels: 1, 6, 11 (non-overlapping in 2.4GHz).
+	  
+	  To find your router's channel:
+	  - Windows: netsh wlan show networks mode=bssid
+	  - Linux: iwlist scan | grep Channel
+	  - Router admin page: Look for "Wireless Channel"
 
 endmenu
