@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# ESP32 Smart Home - Main Build System Entry Point
-# Single script to handle all build operations
+# nRF5340 DK Smart Matter Light - Main Build System Entry Point
+# Dual-core build system for APP (Matter) and NET (OpenThread) cores
 
 set -e
 
@@ -13,6 +13,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
 NC='\033[0m'
 
 # Load library functions
@@ -20,37 +21,34 @@ source "$SCRIPTS_LIB/lib.sh"
 
 # Show usage
 show_usage() {
-    echo -e "${GREEN}ESP32 Smart Home - Build System${NC}"
+    echo -e "${GREEN}nRF5340 DK Smart Matter Light - Build System${NC}"
     echo ""
     echo "Usage: ./make.sh <command> [options]"
     echo ""
     echo "Commands:"
     echo -e "  ${YELLOW}setup${NC}      Setup Zephyr environment (first time only)"
-    echo -e "  ${YELLOW}build${NC}      Build the application"
+    echo -e "  ${YELLOW}build${NC}      Build dual-core firmware (APP + NET cores)"
+    echo -e "  ${YELLOW}build-app${NC}   Build APP core only (Matter stack)"
+    echo -e "  ${YELLOW}build-net${NC}   Build NET core only (OpenThread stack)"
     echo -e "  ${YELLOW}clean${NC}      Clean build artifacts"
-    echo -e "  ${YELLOW}flash${NC}      Flash firmware to ESP32"
-    echo -e "  ${YELLOW}monitor${NC}    Open serial monitor"
-    echo -e "  ${YELLOW}all${NC}        Build and flash"
-    echo -e "  ${YELLOW}qemu${NC}       Build and run in QEMU (ARM smoke test)"
-    echo -e "  ${YELLOW}qemu-esp32${NC} Build and run in ESP32 QEMU (blink test)"
+    echo -e "  ${YELLOW}flash${NC}      Flash both cores to nRF5340 DK"
+    echo -e "  ${YELLOW}monitor${NC}    Open serial monitor (debug UART)"
+    echo -e "  ${YELLOW}all${NC}        Build and flash both cores"
     echo -e "  ${YELLOW}docs${NC}       Build documentation (Sphinx)"
-    echo -e "  ${YELLOW}config${NC}     Edit WiFi configuration"
     echo -e "  ${YELLOW}help${NC}       Show this help message"
     echo ""
     echo "Options:"
-    echo "  --board <name>     Specify board (default: esp32_devkitc_wroom)"
     echo "  --port <device>    Specify serial port (default: auto-detect)"
     echo ""
     echo "Examples:"
     echo "  ./make.sh setup              # First time setup"
-    echo "  ./make.sh build              # Build firmware"
-    echo "  ./make.sh flash              # Flash to ESP32"
-    echo "  ./make.sh all                # Build and flash"
-    echo "  ./make.sh qemu               # Run ARM smoke test in QEMU"
-    echo "  ./make.sh qemu-esp32         # Run ESP32 blink test in QEMU"
-    echo "  ./make.sh docs               # Build documentation"
+    echo "  ./make.sh build              # Build both APP and NET cores"
+    echo "  ./make.sh build-app          # Build Matter stack only"
+    echo "  ./make.sh build-net          # Build OpenThread stack only"
+    echo "  ./make.sh flash              # Flash to nRF5340 DK"
+    echo "  ./make.sh all                # Build and flash both cores"
     echo "  ./make.sh monitor            # Monitor serial output"
-    echo "  ./make.sh build --board esp32_devkitc"
+    echo "  ./make.sh docs               # Build documentation"
     echo ""
 }
 
@@ -59,15 +57,10 @@ COMMAND=${1:-help}
 shift || true
 
 # Parse options
-BOARD="esp32_devkitc"
 PORT=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --board)
-            BOARD="$2"
-            shift 2
-            ;;
         --port)
             PORT="$2"
             shift 2
@@ -88,9 +81,21 @@ case $COMMAND in
         ;;
     
     build)
-        print_header "Building Application"
+        print_header "Building Dual-Core Firmware"
         check_environment
-        build_project "$BOARD"
+        build_dual_core
+        ;;
+    
+    build-app)
+        print_header "Building APP Core (Matter Stack)"
+        check_environment
+        build_app_core
+        ;;
+    
+    build-net)
+        print_header "Building NET Core (OpenThread Stack)"
+        check_environment
+        build_net_core
         ;;
     
     clean)
@@ -110,29 +115,12 @@ case $COMMAND in
         ;;
     
     all)
-        print_header "Build and Flash"
+        print_header "Build and Flash Both Cores"
         check_environment
-        build_project "$BOARD"
+        build_dual_core
         flash_firmware "$PORT"
         echo ""
         echo -e "${GREEN}Done! Run './make.sh monitor' to see output${NC}"
-        ;;
-    
-    qemu)
-        print_header "QEMU Smoke Test (ARM)"
-        check_environment
-        run_qemu_test
-        ;;
-    
-    qemu-esp32)
-        print_header "ESP32 QEMU Blink LED Test"
-        check_environment
-        run_esp32_qemu_test
-        ;;
-    
-    config)
-        print_header "Edit Configuration"
-        edit_config
         ;;
     
     docs)

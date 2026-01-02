@@ -14,3 +14,7 @@ __pycache__/
 
 # docs
 /doc/_build*
+
+# Build
+build_app
+build_net

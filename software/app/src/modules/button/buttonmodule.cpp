@@ -6,16 +6,11 @@
 #include "buttonmodule.hpp"
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(button_module_cpp, CONFIG_APP_LOG_LEVEL);
+LOG_MODULE_REGISTER(button_module_cpp, CONFIG_LOG_DEFAULT_LEVEL);
 
 #if DT_NODE_HAS_STATUS(DT_ALIAS(sw0), okay)
 static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);
 #endif
-
-ButtonModule& ButtonModule::getInstance() {
-    static ButtonModule instance;
-    return instance;
-}
 
 ButtonModule::ButtonModule() : callback_(nullptr) {
 }

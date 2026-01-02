@@ -1,0 +1,24 @@
+/* 
+ * Copyright (c) 2024 Nordic Semiconductor ASA
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * NET Core Device Tree Overlay for nRF5340 DK
+ * OpenThread + BLE radio management
+ */
+
+/ {
+	/* NET core manages radio for Thread (802.15.4) and BLE */
+	chosen {
+		zephyr,ieee802154 = &ieee802154;
+	};
+};
+
+/* Enable IEEE 802.15.4 radio for OpenThread */
+&radio {
+	status = "okay";
+};
+
+/* IPC for communication with APP core */
+&ipc0 {
+	status = "okay";
+};

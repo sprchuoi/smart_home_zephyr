@@ -1,0 +1,119 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "West Debug - APP Core",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/software/app/build_app/zephyr/zephyr.elf",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/software",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/home/sprchuoi/zephyr-sdk-0.17.4/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+            "miDebuggerServerAddress": "localhost:2331",
+            "serverLaunchTimeout": 10000,
+            "preLaunchTask": "start-debug-server",
+            "postDebugTask": "kill-debug-server",
+            "logging": {
+                "trace": false,
+                "traceResponse": false,
+                "engineLogging": false
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Break at app initialization",
+                    "text": "break app_core_init",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Continue to app code",
+                    "text": "continue",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "GDB Debug - APP Core",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/software/app/build_app/zephyr/zephyr.elf",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/software",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/home/sprchuoi/zephyr-sdk-0.17.4/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+            "setupCommands": [
+                {
+                    "description": "Connect to J-Link GDB server (Windows host)",
+                    "text": "target remote 172.17.0.1:2331",
+                    "ignoreFailures": false
+                },
+                {
+                    "description": "Set breakpoint at main",
+                    "text": "break main",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Continue to main",
+                    "text": "continue",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build-app",
+            "logging": {
+                "trace": false,
+                "traceResponse": false,
+                "engineLogging": false
+            },
+            "sourceLanguages": ["cpp", "c"],
+            "symbolSearchPath": "${workspaceFolder}/software/app/build_app/zephyr",
+            "additionalProperties": {}
+        },
+        {
+            "name": "GDB Debug - APP Core (Connected)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/software/app/build_app/zephyr/zephyr.elf",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/software",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/home/sprchuoi/zephyr-sdk-0.17.4/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+            "miDebuggerServerAddress": "localhost:2331",
+            "logging": {
+                "trace": false,
+                "traceResponse": false,
+                "engineLogging": false
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Break at app initialization",
+                    "text": "break app_core_init",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Continue to app code",
+                    "text": "continue",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

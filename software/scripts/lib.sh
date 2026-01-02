@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# ESP32 Smart Home - Library Functions
-# Common functions used by build scripts
+# nRF5340 DK Smart Matter Light - Library Functions
+# Dual-core build system for APP (Matter) and NET (OpenThread) cores
 
 # Colors
 RED='\033[0;31m'
@@ -153,44 +153,96 @@ check_environment() {
         exit 1
     fi
     
-    if ! command_exists xtensa-esp32-elf-gcc; then
-        print_warning "ESP32 toolchain not found in PATH"
-        echo "The build may fail without the toolchain"
+    if ! command_exists arm-none-eabi-gcc; then
+        print_warning "ARM toolchain not found in PATH"
+        echo "The build may fail without the ARM toolchain for nRF5340"
     fi
 }
 
-# Build project
-build_project() {
-    local board="$1"
+# Build dual-core firmware (APP + NET)
+build_dual_core() {
+    local app_board="nrf5340dk/nrf5340/cpuapp"
+    local net_board="nrf5340dk/nrf5340/cpunet"
     
     if [ ! -f "app/CMakeLists.txt" ]; then
         print_error "Must run from software/ directory"
         exit 1
     fi
     
-    # Fix board name for ESP32
-    if [ "$board" = "esp32_devkitc_wroom" ] || [ "$board" = "esp32_devkitc" ]; then
-        board="esp32_devkitc/esp32/procpu"
-        print_info "Using board: $board"
+    print_info "Building APP Core (Matter stack)..."
+    if build_app_core; then
+        echo ""
+        print_success "APP Core built successfully"
+    else
+        print_error "APP Core build failed"
+        exit 1
     fi
     
-    print_info "Application: app/"
+    echo ""
+    print_info "Building NET Core (OpenThread stack)..."
+    if build_net_core; then
+        echo ""
+        print_success "NET Core built successfully"
+    else
+        print_error "NET Core build failed"
+        exit 1
+    fi
+    
+    echo ""
+    print_header "Dual-Core Build Complete"
+    print_success "APP Core: app/build_app/zephyr/zephyr.hex"
+    print_success "NET Core: app/build_net/zephyr/zephyr.hex"
+    echo ""
+    print_info "Next: ./make.sh flash"
+}
+
+# Build APP core (Matter protocol stack)
+build_app_core() {
+    local board="nrf5340dk/nrf5340/cpuapp"
+    local build_dir="app/build_app"
+    
+    if [ ! -f "app/CMakeLists.txt" ]; then
+        print_error "Must run from software/ directory"
+        exit 1
+    fi
+    
+    print_info "Board: $board"
+    print_info "Build dir: $build_dir"
     echo ""
     
-    print_info "Building application..."
-    
-    # Try west build
-    if west build -b "$board" app; then
+    if west build -b "$board" -d "$build_dir" app -c; then
         echo ""
-        print_header "Build Complete"
-        print_success "Binary: build/zephyr/zephyr.bin"
-        ls -lh build/zephyr/zephyr.bin 2>/dev/null || true
-        echo ""
-        print_info "Next: ./make.sh flash"
+        print_success "APP Core build successful"
+        ls -lh "$build_dir/zephyr/zephyr.hex" 2>/dev/null || true
         return 0
     else
-        print_error "Build failed"
+        print_error "APP Core build failed"
+        return 1
+    fi
+}
+
+# Build NET core (OpenThread + BLE radio scheduler)
+build_net_core() {
+    local board="nrf5340dk/nrf5340/cpunet"
+    local build_dir="app/build_net"
+    
+    if [ ! -f "app/CMakeLists.txt" ]; then
+        print_error "Must run from software/ directory"
         exit 1
+    fi
+    
+    print_info "Board: $board"
+    print_info "Build dir: $build_dir"
+    echo ""
+    
+    if west build -b "$board" -d "$build_dir" app -c -- -DCONF_FILE=prj_cpunet.conf; then
+        echo ""
+        print_success "NET Core build successful"
+        ls -lh "$build_dir/zephyr/zephyr.hex" 2>/dev/null || true
+        return 0
+    else
+        print_error "NET Core build failed"
+        return 1
     fi
 }
 
@@ -223,12 +275,18 @@ detect_serial_port() {
     echo "$port"
 }
 
-# Flash firmware
+# Flash firmware to nRF5340 DK
 flash_firmware() {
     local port="$1"
     
-    if [ ! -f "build/zephyr/zephyr.bin" ]; then
-        print_error "Binary not found. Build first: ./make.sh build"
+    # Check if both build directories exist
+    if [ ! -f "app/build_app/zephyr/zephyr.hex" ]; then
+        print_error "APP Core binary not found. Build first: ./make.sh build-app"
+        exit 1
+    fi
+    
+    if [ ! -f "app/build_net/zephyr/zephyr.hex" ]; then
+        print_error "NET Core binary not found. Build first: ./make.sh build-net"
         exit 1
     fi
     
@@ -236,42 +294,61 @@ flash_firmware() {
         port=$(detect_serial_port)
     fi
     
+    print_header "Flashing nRF5340 DK"
     print_info "Serial port: $port"
-    print_info "Binary: build/zephyr/zephyr.bin"
+    print_info "APP Core: app/build_app/zephyr/zephyr.hex"
+    print_info "NET Core: app/build_net/zephyr/zephyr.hex"
     echo ""
     
-    print_info "Flashing firmware..."
-    
-    if command_exists west; then
-        west flash --esp-device "$port"
-    elif command_exists esptool.py; then
-        esptool.py --chip esp32 --port "$port" --baud 460800 \
-            --before default_reset --after hard_reset write_flash \
-            -z --flash_mode dio --flash_freq 40m --flash_size detect \
-            0x1000 build/zephyr/zephyr.bin
-    else
-        print_error "Neither west nor esptool.py found"
-        echo "Install esptool: pip3 install --user esptool"
+    # Verify west is available and can flash
+    if ! command_exists west; then
+        print_error "west not found"
+        echo "Install: pip3 install --user west"
         exit 1
     fi
     
-    if [ $? -eq 0 ]; then
+    # Check if nrfjprog is available (Nordic Segger J-Link flashing tool)
+    if ! command_exists nrfjprog; then
+        print_warning "nrfjprog not found. Attempting to flash via west..."
+        print_info "For optimal performance, install nRF Command Line Tools"
         echo ""
-        print_header "Flash Complete"
-        print_success "Firmware flashed successfully"
-        echo ""
-        print_info "Monitor output: ./make.sh monitor"
+    fi
+    
+    print_info "Flashing APP Core..."
+    if west flash -d app/build_app -r jlink 2>/dev/null || west flash -d app/build_app -r nrfjprog 2>/dev/null || west flash -d app/build_app; then
+        print_success "APP Core flashed successfully"
     else
-        echo ""
-        print_error "Flash failed"
+        print_error "APP Core flash failed"
         echo ""
         print_warning "Troubleshooting:"
-        echo "  1. Press and hold BOOT button during flash"
-        echo "  2. Check USB cable"
-        echo "  3. Verify port: ls /dev/ttyUSB*"
-        echo "  4. Check permissions: sudo chmod 666 $port"
+        echo "  1. Install nRF Command Line Tools: https://www.nordicsemi.com/Products/Development-tools/nrf-command-line-tools"
+        echo "  2. Connect nRF5340 DK via USB"
+        echo "  3. Check USB connection: lsusb | grep SEGGER"
         exit 1
     fi
+    
+    echo ""
+    print_info "Flashing NET Core..."
+    if west flash -d app/build_net -r jlink 2>/dev/null || west flash -d app/build_net -r nrfjprog 2>/dev/null || west flash -d app/build_net; then
+        print_success "NET Core flashed successfully"
+    else
+        print_error "NET Core flash failed"
+        exit 1
+    fi
+    
+    echo ""
+    print_header "Flash Complete"
+    print_success "Both cores flashed successfully to nRF5340 DK"
+    echo ""
+    print_info "LEDs on board:"
+    echo "  LED1 (P0.28) = Matter/commissioning status"
+    echo "  LED2 (P1.6)  = Thread network status"
+    echo ""
+    print_info "Buttons on board:"
+    echo "  Button1 (P0.23) = Toggle LED, short press to commission"
+    echo "  Button2 (P0.24) = Factory reset"
+    echo ""
+    print_info "Monitor output: ./make.sh monitor"
 }
 
 # Open serial monitor
@@ -286,8 +363,9 @@ open_monitor() {
     print_info "Port: $port"
     print_info "Baudrate: $baudrate"
     echo ""
-    print_info "Press Ctrl+A then K to exit screen"
-    print_info "Press RESET button on ESP32 to restart"
+    print_info "Debug UART output from APP core"
+    print_info "Press Ctrl+A then K to exit screen, or Ctrl+C to exit minicom"
+    print_info "Press RESET button on nRF5340 DK to restart"
     echo ""
     sleep 2
     
@@ -297,35 +375,9 @@ open_monitor() {
         minicom -D "$port" -b "$baudrate"
     else
         print_error "No serial monitor found"
-        echo "Install: sudo apt install screen"
+        echo "Install: sudo apt install screen (or minicom)"
         exit 1
     fi
-}
-
-# Edit WiFi configuration
-edit_config() {
-    local config_file="app/src/modules/wifi/wifi_module.h"
-    
-    if [ ! -f "$config_file" ]; then
-        print_error "Config file not found: $config_file"
-        exit 1
-    fi
-    
-    print_info "Opening WiFi configuration..."
-    echo ""
-    print_info "Edit these values:"
-    echo "  - WIFI_SSID (Station mode)"
-    echo "  - WIFI_PSK (Station password)"
-    echo "  - WIFI_AP_SSID (AP mode)"
-    echo "  - WIFI_AP_PSK (AP password)"
-    echo ""
-    
-    # Use default editor or nano
-    ${EDITOR:-nano} "$config_file"
-    
-    echo ""
-    print_success "Configuration updated"
-    print_info "Rebuild to apply: ./make.sh build"
 }
 
 # Build documentation
@@ -389,162 +441,6 @@ build_docs() {
     cd - > /dev/null
 }
 
-# Run QEMU smoke test
-run_qemu_test() {
-    local qemu_board="qemu_cortex_m3"
-    local timeout_sec=30
-    
-    print_info "Building for QEMU (ARM Cortex-M3)..."
-    
-    # Check if QEMU is installed
-    if ! command_exists qemu-system-arm; then
-        print_warning "QEMU ARM not found"
-        print_info "Install: sudo apt-get install qemu-system-arm (Ubuntu/Debian)"
-        print_info "         brew install qemu (macOS)"
-        return 1
-    fi
-    
-    # Build with minimal configuration for QEMU
-    print_info "Building minimal configuration..."
-    west build -b "$qemu_board" app -p -- \
-        -DCONFIG_BT=n \
-        -DCONFIG_WIFI=n \
-        -DCONFIG_NETWORKING=n \
-        -DCONFIG_DISPLAY=n \
-        -DCONFIG_I2C=n || {
-        print_error "QEMU build failed"
-        return 1
-    }
-    
-    print_success "Build successful"
-    print_info "Running in QEMU (${timeout_sec}s timeout)..."
-    echo ""
-    
-    # Run in QEMU with timeout
-    timeout "${timeout_sec}s" west build -t run || EXIT_CODE=$?
-    
-    echo ""
-    
-    # Check exit code
-    if [ ${EXIT_CODE:-0} -eq 124 ]; then
-        print_success "QEMU smoke test passed (timeout = application running)"
-    elif [ ${EXIT_CODE:-0} -eq 0 ]; then
-        print_success "QEMU smoke test passed (clean exit)"
-    else
-        print_error "QEMU smoke test failed (exit code: $EXIT_CODE)"
-        return $EXIT_CODE
-    fi
-    
-    print_info "Build artifacts: build/zephyr/zephyr.elf"
-    return 0
-}
-
-# Run ESP32 QEMU smoke test
-run_esp32_qemu_test() {
-    local esp32_board="esp32_devkitc/esp32/procpu"
-    local timeout_sec=30
-    local qemu_bin="qemu-system-xtensa"
-    
-    print_info "Building for ESP32 QEMU..."
-    
-    # Check if Espressif QEMU is installed
-    if ! command_exists "$qemu_bin"; then
-        print_warning "Espressif QEMU not found"
-        echo ""
-        read -p "Would you like to install Espressif QEMU automatically? (y/N) " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            install_espressif_qemu || {
-                print_error "Failed to install Espressif QEMU"
-                print_info "Manual installation:"
-                print_info "  - Download from: https://github.com/espressif/qemu/releases"
-                print_info "  - macOS Homebrew: brew install espressif/espressif/qemu"
-                return 1
-            }
-        else
-            print_info "Manual installation:"
-            print_info "  - Download from: https://github.com/espressif/qemu/releases"
-            print_info "  - macOS Homebrew: brew install espressif/espressif/qemu"
-            return 1
-        fi
-    fi
-    
-    print_success "QEMU Binary: $(which $qemu_bin)"
-    
-    # Fetch ESP32 HAL blobs if not already present
-    print_info "Fetching ESP32 HAL blobs..."
-    west blobs fetch hal_espressif || {
-        print_warning "Could not fetch HAL blobs (may already exist)"
-    }
-    
-    # Build for ESP32
-    print_info "Building for ESP32..."
-    west build -b "$esp32_board" app -p || {
-        print_error "ESP32 build failed"
-        return 1
-    }
-    
-    print_success "Build successful"
-    
-    local flash_img="build/zephyr/zephyr.bin"
-    local qemu_log="build/esp32_qemu_output.log"
-    
-    if [ ! -f "$flash_img" ]; then
-        print_error "Flash image not found: $flash_img"
-        return 1
-    fi
-    
-    print_info "Running ESP32 in QEMU (${timeout_sec}s timeout)..."
-    print_info "Flash Image: $flash_img"
-    echo ""
-    
-    # Create QEMU command
-    # Run QEMU with ESP32 configuration and capture output
-    timeout "${timeout_sec}s" "$qemu_bin" \
-        -nographic \
-        -machine esp32 \
-        -drive file="$flash_img",if=mtd,format=raw \
-        -serial mon:stdio \
-        2>&1 | tee "$qemu_log" || EXIT_CODE=$?
-    
-    echo ""
-    
-    # Check QEMU output for expected messages
-    local test_passed=0
-    
-    if grep -q "Blink module initialized" "$qemu_log" 2>/dev/null; then
-        print_success "✓ Blink module initialized"
-        test_passed=1
-    fi
-    
-    if grep -q "Blink task started" "$qemu_log" 2>/dev/null; then
-        print_success "✓ Blink task started"
-        test_passed=1
-    fi
-    
-    if grep -q "Display module initialized" "$qemu_log" 2>/dev/null; then
-        print_success "✓ Display module initialized"
-        test_passed=1
-    fi
-    
-    # Check exit code
-    if [ $test_passed -eq 1 ]; then
-        print_success "ESP32 QEMU smoke test passed (modules initialized)"
-    elif [ ${EXIT_CODE:-0} -eq 124 ]; then
-        print_success "ESP32 QEMU smoke test passed (timeout = application running)"
-    elif [ ${EXIT_CODE:-0} -eq 0 ]; then
-        print_success "ESP32 QEMU smoke test passed (clean exit)"
-    else
-        print_error "ESP32 QEMU smoke test failed (exit code: $EXIT_CODE)"
-        print_info "QEMU log: $qemu_log"
-        return $EXIT_CODE
-    fi
-    
-    print_info "Build artifacts: build/zephyr/zephyr.bin"
-    print_info "QEMU output log: $qemu_log"
-    return 0
-}
-
 # Export functions
 export -f print_header
 export -f print_success
@@ -552,14 +448,12 @@ export -f print_error
 export -f print_warning
 export -f print_info
 export -f command_exists
-export -f install_espressif_qemu
 export -f check_environment
-export -f build_project
+export -f build_dual_core
+export -f build_app_core
+export -f build_net_core
 export -f clean_build
 export -f detect_serial_port
 export -f flash_firmware
 export -f open_monitor
-export -f edit_config
 export -f build_docs
-export -f run_qemu_test
-export -f run_esp32_qemu_test

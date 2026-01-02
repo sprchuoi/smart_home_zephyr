@@ -1,0 +1,168 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-app",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "source ~/zephyrproject/zephyr/zephyr-env.sh && cd ${workspaceFolder}/software && ./make.sh build-app"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "build-all",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "source ~/zephyrproject/zephyr/zephyr-env.sh && cd ${workspaceFolder}/software && ./make.sh build"
+            ],
+            "group": {
+                "kind": "build"
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "flash",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "source ~/zephyrproject/zephyr/zephyr-env.sh && cd ${workspaceFolder}/software && ./make.sh flash"
+            ],
+            "group": {
+                "kind": "build"
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "monitor",
+            "type": "shell",
+            "command": "screen",
+            "args": [
+                "/dev/ttyACM0",
+                "115200"
+            ],
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            }
+        },
+        {
+            "label": "start-jlink-gdb-server",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "JLinkGDBServer -device nRF5340_xxAA_APP -if SWD -speed 4000 -port 2331"
+            ],
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "start-debug-server",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "source ~/zephyrproject/zephyr/zephyr-env.sh && cd ${workspaceFolder}/software && west debugserver --build-dir app/build_app"
+            ],
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated"
+            },
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".*west debugserver.*",
+                    "endsPattern": ".*(Listening on port|GDB Server Listening).*"
+                }
+            }
+        },
+        {
+            "label": "west-debug-server",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "source ~/zephyrproject/zephyr/zephyr-env.sh && cd ${workspaceFolder}/software && west debugserver --build-dir app/build_app; echo 'Debug server stopped'; read -p 'Press enter to close'"
+            ],
+            "isBackground": true,
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "dedicated"
+            },
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".*west debugserver.*",
+                    "endsPattern": ".*(Listening on port|waiting for connection).*"
+                }
+            }
+        },
+        {
+            "label": "kill-debug-server",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "pkill -f 'west debugserver' || pkill openocd || pkill JLinkGDBServer || true"
+            ],
+            "presentation": {
+                "echo": false,
+                "reveal": "never",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}
