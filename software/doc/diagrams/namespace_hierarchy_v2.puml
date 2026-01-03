@@ -1,0 +1,55 @@
+@startuml namespace_hierarchy
+skinparam backgroundColor #FFFFFF
+skinparam packageStyle rectangle
+skinparam defaultFontSize 10
+
+title C++ Namespace Hierarchy
+
+package "smarthome::" as SM {
+    package "hw::" #LightCoral {
+        interface ButtonManager
+        interface UartManager
+    }
+    
+    package "protocol::" {
+        package "matter::" #LightGreen {
+            interface AppTask
+            interface LightEndpoint
+        }
+        
+        package "thread::" #LightYellow {
+            interface ThreadNetworkManager
+            interface NetworkResilienceManager
+        }
+        
+        package "ble::" #LightPink {
+            interface BLEManager
+        }
+        
+        package "radio::" #LightPink {
+            interface RadioManager
+        }
+    }
+    
+    package "ipc::" #Orange {
+        interface IPCCore
+    }
+    
+    package "services::" {
+        package "wakeword::" #Lavender {
+            interface ModelLoader
+        }
+    }
+}
+
+package "net::" as NET #LightBlue {
+    interface NetCoreManager
+}
+
+AppTask ..> IPCCore
+ThreadNetworkManager ..> IPCCore
+NetCoreManager ..> BLEManager
+NetCoreManager ..> RadioManager
+NetCoreManager ..> IPCCore
+
+@enduml

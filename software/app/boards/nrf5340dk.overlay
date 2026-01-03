@@ -22,7 +22,14 @@
 	chosen {
 		zephyr,console = &uart0;
 		zephyr,shell-uart = &uart0;
+		zephyr,ipc = &ipc0;
+		zephyr,ipc-shm = &sram0_shared;
 	};
+};
+
+/* Shared memory region for IPC */
+&sram0_shared {
+	reg = <0x20070000 0x10000>;
 };
 
 /* Configure UART for logging */
@@ -41,4 +48,14 @@
 	status = "okay";
 	sda-pin = <26>;
 	scl-pin = <27>;
+};
+
+/* IPC mailbox for inter-core communication */
+&ipc0 {
+	status = "okay";
+};
+
+/* MBOX for IPC service */
+&mbox {
+	status = "okay";
 };

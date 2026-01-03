@@ -44,16 +44,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(CONFIG_SOC_NRF5340_CPUAPP)
     target_sources(app PRIVATE
         # Core application - main entry point and event loop
-        src/app_core.cpp
-        src/cpp_support.cpp
+        src/app_core/app_core.cpp
+        src/app_core/cpp_support.cpp
         
-        # Matter protocol stack integration
-        src/modules/matter/app_task.cpp
-        src/modules/matter/light_endpoint.cpp
+        # Shared SDK - Protocol layer (Matter + Thread)
+        src/sdk/protocol/matter/app_task.cpp
+        src/sdk/protocol/matter/light_endpoint.cpp
+        src/sdk/protocol/matter/commissioning_delegate.cpp
+        src/sdk/protocol/thread/thread_network_manager.cpp
+        src/sdk/protocol/thread/network_resilience_manager.cpp
         
-        # Hardware abstraction layer - GPIO control and user input
-        src/modules/button/buttonmodule.cpp
-        src/modules/uart/uartmodule.cpp
+        # Shared SDK - Hardware abstraction layer
+        src/sdk/hw/button/button_manager.cpp
+        src/sdk/hw/uart/uart_manager.cpp
+        
+        # Shared SDK - IPC module for inter-core communication
+        src/sdk/ipc/ipc_core.cpp
     )
 endif()
 
@@ -61,8 +67,15 @@ endif()
 # Target: nrf5340dk_nrf5340_cpunet (Cortex-M33 @ 64 MHz)
 if(CONFIG_SOC_NRF5340_CPUNET)
     target_sources(app PRIVATE 
-        # Network stack - Thread and BLE radio management
-        src/net_core.c
+        # Network core with state machine
+        src/net_core/net_core.cpp
+        
+        # Shared SDK - IPC module for inter-core communication
+        src/sdk/ipc/ipc_core.cpp
+        
+        # Shared SDK - Protocol layer (BLE and Radio subsystems)
+        src/sdk/protocol/ble/ble_manager.cpp
+        src/sdk/protocol/radio/radio_manager.cpp
     )
 endif()
 
@@ -71,9 +84,15 @@ endif()
 #===============================================================================
 # Make headers available throughout the project
 target_include_directories(app PRIVATE 
-    src                              # Core source files
-    src/modules                      # Module headers (matter, button, uart)
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include  # Public API headers
+    src                                    # Core source root
+    src/app_core                           # APP core headers
+    src/net_core                           # NET core headers
+    src/sdk                                # Shared SDK headers root
+    src/sdk/hw                             # Hardware abstraction layer
+    src/sdk/protocol                       # Protocol layer
+    src/sdk/services                       # Services layer
+    src/sdk/ipc                            # IPC headers
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include # Public API headers
 )
 
 #===============================================================================

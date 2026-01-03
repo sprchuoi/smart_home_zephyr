@@ -6,229 +6,333 @@ Architecture Overview
 Introduction
 ************
 
-The ESP32 Smart Home application is built using a **C++ Object-Oriented Programming (OOP)** architecture on top of the Zephyr RTOS. The design follows the **Singleton pattern** for hardware modules and uses **task-based concurrency** for parallel operations.
+The nRF5340 DK Matter Smart Light is built using a **dual-core architecture** with **C++ Object-Oriented Programming (OOP)** on top of the Zephyr RTOS. The system leverages the nRF5340's dual ARM Cortex-M33 processors to separate application logic from radio protocol handling, following **namespace-based modularization** and **inter-processor communication** patterns.
 
-System Architecture
-*******************
+Dual-Core System Architecture
+******************************
 
-The application is structured in three main layers:
+The application utilizes both cores of the nRF5340:
 
-.. code-block:: text
+* **APP Core (Cortex-M33 @ 128 MHz)**: Matter protocol, Thread networking, LED/button control
+* **NET Core (Cortex-M33 @ 64 MHz)**: BLE radio, 802.15.4 radio, OpenThread MAC/PHY
 
-    ┌─────────────────────────────────────┐
-    │     Application Layer (main.cpp)    │
-    │  - Initialization                   │
-    │  - Task orchestration               │
-    └─────────────────┬───────────────────┘
-                      │
-    ┌─────────────────┴───────────────────┐
-    │      Module Layer (C++ Singletons)  │
-    │  - BleService                       │
-    │  - WiFiService                      │
-    │  - SensorModule                     │
-    │  - UartModule                       │
-    │  - DisplayModule                    │
-    │  - BlinkModule                      │
-    │  - ButtonModule                     │
-    └─────────────────┬───────────────────┘
-                      │
-    ┌─────────────────┴───────────────────┐
-    │    Hardware Abstraction Layer       │
-    │  - Zephyr Device Drivers            │
-    │  - Device Tree Bindings             │
-    └─────────────────────────────────────┘
+Architecture Diagram
+====================
+
+.. uml:: diagrams/dual_core_architecture.puml
+   :align: center
+   :scale: 75%
+   :caption: nRF5340 Dual-Core System Architecture
+
+Hardware Resources
+==================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 25 25 30
+
+   * - Core
+     - Flash Usage
+     - RAM Usage
+     - Primary Responsibilities
+   * - APP Core
+     - 75 KB (7.16%)
+     - 34 KB (7.40%)
+     - Matter, Thread, UI
+   * - NET Core
+     - 142 KB (54.26%)
+     - 31 KB (47.25%)
+     - BLE, 802.15.4 radio
 
 Design Patterns
 ***************
 
-Singleton Pattern
-=================
+Namespace-Based Modularization
+===============================
 
-All hardware modules use the singleton pattern to ensure only one instance manages each hardware resource:
+All SDK modules use hierarchical C++ namespaces for clear organization:
 
 .. code-block:: cpp
 
-    class BleService {
-    public:
-        static BleService& getInstance() {
-            static BleService instance;
-            return instance;
+    namespace smarthome {
+        namespace protocol {
+            namespace matter {
+                class AppTask { /* ... */ };
+                class LightEndpoint { /* ... */ };
+            }
+            
+            namespace thread {
+                class ThreadNetworkManager { /* ... */ };
+            }
+            
+            namespace ble {
+                class BLEManager { /* ... */ };
+            }
         }
         
-        // Delete copy constructor and assignment
-        BleService(const BleService&) = delete;
-        BleService& operator=(const BleService&) = delete;
+        namespace hw {
+            class ButtonManager { /* ... */ };
+            class UartManager { /* ... */ };
+        }
         
-    private:
-        BleService() = default;
-    };
+        namespace ipc {
+            class IPCCore { /* ... */ };
+        }
+    }
+    
+    // NET core uses separate namespace
+    namespace net {
+        class NetCoreManager { /* ... */ };
+    }
 
-Task-Based Concurrency
-======================
+Namespace Hierarchy
+===================
 
-Each functional area runs in its own Zephyr thread with appropriate priority:
+.. uml:: diagrams/namespace_hierarchy.puml
+   :align: center
+   :scale: 75%
+   :caption: C++ Namespace Structure
 
-.. list-table::
-   :header-rows: 1
-   :widths: 20 15 15 50
+.. code-block:: text
 
-   * - Task
-     - Priority
-     - Stack
-     - Purpose
-   * - uart_task
-     - 5
-     - 2048
-     - UART communication
-   * - ble_task
-     - 6
-     - 2048
-     - BLE advertising & notifications
-   * - wifi_task
-     - 7
-     - 2048
-     - WiFi AP/STA management
-   * - sensor_task
-     - 8
-     - 1024
-     - Sensor reading
-   * - blink_task
-     - 9
-     - 1024
-     - LED blinking
-   * - display_task
-     - 10
-     - 2048
-     - Display updates
+    smarthome::
+    ├── hw::
+    │   ├── ButtonManager
+    │   └── UartManager
+    │
+    ├── protocol::
+    │   ├── matter::
+    │   │   ├── AppTask
+    │   │   ├── LightEndpoint
+    │   │   └── CommissioningDelegate
+    │   │
+    │   ├── thread::
+    │   │   ├── ThreadNetworkManager
+    │   │   └── NetworkResilienceManager
+    │   │
+    │   ├── ble::
+    │   │   └── BLEManager
+    │   │
+    │   └── radio::
+    │       └── RadioManager
+    │
+    ├── ipc::
+    │   ├── IPCCore
+    │   └── MessageType (enum)
+    │
+    └── services::
+        └── wakeword::
+            └── ModelLoader
+    
+    net::                    (NET core only)
+    └── NetCoreManager
 
-C++ Features Used
-*****************
+.. note::
+   PlantUML diagram available in CI/CD builds at ``doc/diagrams/namespace_hierarchy.puml``
 
-Standard Library Support
-========================
+Function Pointer Callbacks
+===========================
 
-The application uses **C++17** with **Newlib** C library:
-
-* No STL support (std::function, std::vector, etc.)
-* Uses function pointers instead of std::function
-* Static callbacks instead of lambdas
-* Manual memory management (no smart pointers)
-
-Example callback pattern:
+The application uses function pointers instead of ``std::function`` due to Zephyr's minimal C++ support:
 
 .. code-block:: cpp
 
     // Define callback type
-    using ConnectionCallback = void (*)(bool connected);
+    using ButtonCallback = void (*)(bool pressed);
     
     // Static callback function
-    static void connection_callback(bool connected) {
-        // Handle connection state
+    static void button_callback(bool pressed) {
+        if (pressed) {
+            // Handle button press
+        }
     }
     
     // Register callback
-    BleService::getInstance().setConnectionCallback(connection_callback);
+    ButtonManager::getInstance().setCallback(button_callback);
 
-Module Organization
-*******************
+Inter-Processor Communication
+==============================
+
+The two cores communicate via **RPMsg/OpenAMP** protocol.
+
+.. uml:: diagrams/ipc_communication.puml
+   :align: center
+   :scale: 75%
+   :caption: Inter-Processor Communication Sequence
+
+Hardware interrupts for low latency
+* Asynchronous bidirectional communication
+* Message buffering in OpenAMP
+
+C++ Features Used
+*****************
+
+Minimal C++ Standard Library
+=============================
+
+The application uses **C++17** with **minimal standard library support**:
+
+* No STL containers (std::vector, std::map, etc.)
+* No ``std::function`` (use function pointers)
+* No exceptions (``-fno-exceptions``)
+* No RTTI (``-fno-rtti``)
+* Use C headers (``<string.h>`` not ``<cstring>``)
+* Manual memory management
+
+Example patterns:
+
+.. code-block:: cpp
+
+    // Use function pointers, not std::function
+    using Callback = void (*)(int value);
+    
+    // Use C headers
+    #include <string.h>  // NOT <cstring>
+    #include <zephyr/kernel.h>
+    
+    // Use Zephyr kernel types
+    K_KERNEL_STACK_MEMBER(stack, 1024);  // NOT K_THREAD_STACK_MEMBER
+    
+    // Include kernel.h BEFORE namespace declarations
+    // to avoid scoping issues with k_timer, k_mutex, etc.
 
 Directory Structure
-===================
+~~~~~~~~~~~~~~~~~~~
+
+.. uml:: diagrams/directory_structure.puml
+   :align: center
+   :scale: 75%
+   :caption: Source Code Organization
 
 .. code-block:: text
 
-    app/src/
-    ├── main.cpp                    # Application entry point
-    ├── cpp_support.cpp            # C++ runtime support
-    ├── modules/                   # Hardware abstraction modules
-    │   ├── ble/
-    │   │   ├── bleservice.hpp
-    │   │   └── bleservice.cpp
-    │   ├── wifi/
-    │   │   ├── wifiservice.hpp
-    │   │   └── wifiservice.cpp
-    │   ├── uart/
-    │   │   ├── uartmodule.hpp
-    │   │   └── uartmodule.cpp
-    │   ├── sensor/
-    │   ├── display/
-    │   ├── blink/
-    │   └── button/
-    └── thread/                    # Task implementations
-        ├── uart_task.cpp
-        ├── ble_task.cpp
-        ├── wifi_task.cpp
-        ├── sensor_task.cpp
-        ├── blink_task.cpp
-        └── display_task.cpp
+      src/
+      ├── app_core/                     # APP Core entry point
+      │   ├── app_core.cpp              # Main application logic
+      │   └── cpp_support.cpp           # C++ runtime support
+      │
+      ├── net_core/                     # NET Core entry point
+      │   ├── net_core.hpp              # NET core manager
+      │   └── net_core.cpp              # Network processor state machine
+      │
+      ├── app_core/                     # APP Core entry point
+    │   ├── app_core.cpp              # Main application logic
+      └── sdk/                          # Shared SDK library (both cores)
+          ├── protocol/                 # Protocol implementations
+          │   ├── matter/               # Matter (CHIP) protocol [APP]
+          │   │   ├── app_task.cpp
+          │   │   ├── light_endpoint.cpp
+          │   │   └── commissioning_delegate.cpp
+          │   │
+          │   ├── thread/               # Thread networking [APP]
+    └── sdk/                          # Shared SDK library (both cores)
+        ├── protocol/                 # Protocol implementations
+        │   ├── matter/               # Matter (CHIP) protocol [APP]
+        │   │   ├── app_task.cpp
+        │   │   ├── light_endpoint.cpp
+        │   │   └── commissioning_delegate.cpp
+        │   │
+        │   ├── thread/               # Thread networking [APP]
+        │   │   ├── thread_network_manager.cpp
+        │   │   └── network_resilience_manager.cpp
+        │   │
+        │   ├── ble/                  # Bluetooth Low Energy [NET]
+        │   │   └── ble_manager.cpp
+        │   │
+        │   └── radio/                # IEEE 802.15.4 radio [NET]
+        │       └── radio_manager.cpp
+        │
+        ├── hw/                       # Hardware abstraction [APP]
+        │   ├── button/
+        │   │   └── button_manager.cpp
+        │   └── uart/
+        │       └── uart_manager.cpp
+        │
+        ├── ipc/                      # Inter-processor comm [BOTH]
+        │   └── ipc_core.cpp
+        │
+        └── services/                 # Higher-level services
+            └── wakeword/             # ML model loading
+                └── model_loader.cpp
+
+Legend:
+
+* ``[APP]`` - Used only by APP core
+* ``[NET]`` - Used only by NET core
+* ``[BOTH]`` - Shared by both cores
+
+.. note::
+   PlantUML diagram available in CI/CD builds at ``doc/diagrams/directory_structure.puml``ucture.puml`` for PlantUML diagram with color coding.
 
 Module Responsibilities
 =======================
 
-BleService
-----------
+APP Core Modules
+~~~~~~~~~~~~~~~~
 
-:Purpose: Bluetooth Low Energy communication
-:Features:
-    * GAP advertising
-    * GATT service management
-    * Notification support
-    * Connection state management
+**AppTask** (``sdk/protocol/matter/``)
+   Matter application state machine and event handling
 
-WiFiService
------------
+**LightEndpoint** (``sdk/protocol/matter/``)
+   Matter endpoint for LED control (on/off, brightness)
 
-:Purpose: WiFi network connectivity
-:Features:
-    * Station mode (connect to AP)
-    * Access Point mode (create hotspot)
-    * AP+STA simultaneous mode
-    * Network scanning
-    * DHCP client
+**ThreadNetworkManager** (``sdk/protocol/thread/``)
+   Thread network initialization and management
 
-UartModule
-----------
+**NetworkResilienceManager** (``sdk/protocol/thread/``)
+   Network health monitoring and recovery
 
-:Purpose: Serial communication
-:Features:
-    * Interrupt-driven reception
-    * Message queue for thread communication
-    * Echo functionality
-    * BLE forwarding
+**ButtonManager** (``sdk/hw/button/``)
+   GPIO button input with debouncing
 
-SensorModule
-------------
+**UartManager** (``sdk/hw/uart/``)
+   Serial communication interface
 
-:Purpose: Sensor data acquisition
-:Features:
-    * Device tree binding
-    * Periodic reading
-    * Callback notification
+NET Core Modules
+~~~~~~~~~~~~~~~~
 
-DisplayModule
--------------
+**NetCoreManager** (``net_core/``)
+   Network processor state machine and coordinator
 
-:Purpose: Display management (SSD1306 OLED)
-:Features:
-    * Text rendering
-    * Status display
-    * Character framebuffer
+**BLEManager** (``sdk/protocol/ble/``)
+   Bluetooth Low Energy advertising and connections
 
-BlinkModule
------------
+**RadioManager** (``sdk/protocol/radio/``)
+   IEEE 802.15.4 radio control and MAC layer
 
-:Purpose: LED control
-:Features:
-    * Configurable blink period
-    * GPIO control via custom driver
+Shared Modules
+~~~~~~~~~~~~~~
 
-ButtonModule
-------------
+**IPCCore** (``sdk/ipc/``)
+   Inter-processor communication using RPMsg/OpenAMP
+   Used by both APP and NET cores
 
-:Purpose: Button input handling
-:Features:
-    * GPIO interrupt
-    * Debouncing
+**ModelLoader** (``sdk/services/wakeword/``)
+   Machine learning model loading service
+
+Inter-Core Communication
+************************
+
+The APP and NET cores communicate via the **IPC Core** module using Zephyr's OpenAMP/RPMsg:
+
+Message Types
+=============
+
+* **Radio Control**: Commands from APP to NET for radio configuration
+* **BLE Status**: Connection state updates from NET to APP
+* **Network Statistics**: Link quality and performance data
+* **Power Management**: Sleep/wake coordination
+
+Communication Flow
+==================
+
+1. APP core calls ``IPCCore::send(message)``
+2. Message serialized and placed in shared memory
+3. NET core interrupted via IPC mechanism
+4. NET core ``IPCCore::receive()`` callback invoked
+5. Message deserialized and processed
+
+See :ref:`inter_thread_communication` for detailed IPC documentation.
     * Callback notification
 
 Inter-Module Communication
@@ -242,75 +346,136 @@ The modules communicate through several mechanisms:
 4. **Semaphores**: Resource protection and synchronization
 
 Initialization Sequence
-***********************
+APP Core Initialization
+========================
 
-The application follows a strict initialization order in ``main.cpp``:
+The APP core follows this initialization sequence in ``app_core.cpp``:
 
-1. **Module Initialization** (``Os_Init()``):
-   
-   .. code-block:: cpp
+.. code-block:: cpp
 
-       BlinkModule::getInstance().init();
-       SensorModule::getInstance().init();
-       BleService::getInstance().init();
-       WiFiService::getInstance().init(WiFiService::Mode::AP_STA);
-       DisplayModule::getInstance().init();
-       ButtonModule::getInstance().init();
+    extern "C" int main() {
+        // 1. Initialize hardware managers
+        smarthome::hw::ButtonManager::getInstance().init();
+        smarthome::hw::UartManager::getInstance().init();
+        
+        // 2. Initialize IPC for inter-core communication
+        smarthome::ipc::IPCCore::getInstance().init();
+        
+        // 3. Initialize Matter protocol stack
+        smarthome::protocol::matter::AppTask::getInstance().init();
+        smarthome::protocol::matter::LightEndpoint::getInstance().init();
+        
+        // 4. Initialize Thread networking
+        smarthome::protocol::thread::ThreadNetworkManager::getInstance().init();
+        
+        // 5. Start Matter application
+        smarthome::protocol::matter::AppTask::getInstance().startApp();
+        
+        // 6. Main thread sleep
+        while (1) {
+            k_sleep(K_FOREVER);
+        }
+    }
 
-2. **Task Creation** (``Os_Start()``):
-   
-   .. code-block:: cpp
+NET Core Initialization
+========================
 
-       blink_task_start();
-       sensor_task_start();
-       ble_task_start();
-       wifi_task_start();
-       display_task_start();
-       uart_task_start();
+The NET core follows this initialization sequence in ``net_core.cpp``:
 
-3. **Main Thread Sleep**:
-   
-   .. code-block:: cpp
+.. code-block:: cpp
 
-       while (1) {
-           k_sleep(K_FOREVER);
-       }
+    extern "C" int main() {
+        // 1. Create NET core manager
+        net::NetCoreManager net_core;
+        
+        // 2. Initialize (sets up BLE, Radio, IPC)
+        net_core.init();
+        
+        // 3. Run state machine
+        net_core.run();  // Never returns
+    }
+
+The NET core manager internally initializes:
+
+1. ``smarthome::ipc::IPCCore`` - Inter-core communication
+2. ``smarthome::protocol::ble::BLEManager`` - Bluetooth radio
+3. ``smarthome::protocol::radio::RadioManager`` - 802.15.4 radio
 
 Build System
 ************
 
 The application uses CMake with Zephyr's build system:
 
-* **CMakeLists.txt**: Defines source files and dependencies
-* **prj.conf**: Zephyr configuration options
+* **CMakeLists.txt**: Defines source files for both cores
+* **prj_nrf5340_app.conf**: APP core configuration
+* **prj_nrf5340_net.conf**: NET core configuration (requires ``CONFIG_STATIC_INIT_GNU=y`` for C++)
 * **Kconfig**: Custom configuration symbols
 * **Device Tree Overlays**: Board-specific hardware configuration
+
+Build Configuration
+===================
+
+.. code-block:: cmake
+
+    # APP Core sources
+    if(CONFIG_SOC_NRF5340_CPUAPP)
+        target_sources(app PRIVATE
+            src/app_core/app_core.cpp
+            src/sdk/protocol/matter/app_task.cpp
+            src/sdk/protocol/thread/thread_network_manager.cpp
+            src/sdk/hw/button/button_manager.cpp
+            src/sdk/ipc/ipc_core.cpp
+        )
+    endif()
+    
+    # NET Core sources
+    if(CONFIG_SOC_NRF5340_CPUNET)
+        target_sources(app PRIVATE
+            src/net_core/net_core.cpp
+            src/sdk/protocol/ble/ble_manager.cpp
+            src/sdk/protocol/radio/radio_manager.cpp
+            src/sdk/ipc/ipc_core.cpp
+        )
+    endif()
 
 Memory Layout
 *************
 
-ESP32 Memory Regions:
+nRF5340 Memory Regions:
 
 .. list-table::
    :header-rows: 1
-   :widths: 25 20 20 35
+   :widths: 20 20 20 40
 
-   * - Region
+   * - Core
+     - Region
      - Size
      - Usage
-     - Notes
-   * - Flash
-     - 4 MB
-     - 17.7%
-     - Code and constants
-   * - IRAM
-     - 224 KB
-     - 40%
-     - Interrupt handlers
-   * - DRAM0
-     - 140 KB
-     - 89%
-     - Data and BSS
+   * - APP
+     - Flash
+     - 1 MB
+     - 7.16% (75 KB)
+   * - APP
+     - RAM
+     - 448 KB
+     - 7.40% (34 KB)
+   * - NET
+     - Flash
+     - 256 KB
+     - 54.26% (142 KB)
+   * - NET
+     - RAM
+     - 64 KB
+     - 47.25% (31 KB)
+
+The NET core uses more flash due to the OpenThread and BLE protocol stacks.
+
+See Also
+********
+
+* :ref:`inter_thread_communication` - IPC details
+* :ref:`ble_service` - BLE implementation  
+* :ref:`wifi_service` - WiFi/Thread networking
    * - DRAM1
      - 96 KB
      - 38%

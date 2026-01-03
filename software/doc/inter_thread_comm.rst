@@ -1,288 +1,435 @@
 .. _inter_thread_communication:
 
-Inter-Thread Communication
-##########################
+Inter-Processor Communication
+##############################
 
 Overview
 ********
 
-This application uses Zephyr RTOS primitives for efficient inter-thread communication:
+The nRF5340 DK application uses **dual-core architecture** where the APP core and NET core communicate via **RPMsg/OpenAMP** protocol. This enables efficient separation of concerns:
 
-* **Message Queues**: For passing data between threads
-* **Semaphores**: For thread synchronization
-* **Timers**: For periodic operations
+* **APP Core**: High-level application logic (Matter, Thread, UI)
+* **NET Core**: Low-level radio protocols (BLE, 802.15.4)
 
-UART → BLE Communication Flow
-******************************
+Communication Mechanisms
+************************
 
-The following diagram illustrates the data flow from UART interrupt to BLE transmission:
+The cores communicate using:
+
+* **RPMsg/OpenAMP**: Zephyr's inter-processor communication framework
+* **Shared Memory**: Zero-copy message passing
+* **Interrupts**: Fast notification between cores
+* **Message Queues**: Buffered asynchronous communication
+
+IPC Architecture
+****************
+
+.. uml:: diagrams/ipc_communication.puml
+   :align: center
+   :scale: 75%
+   :caption: Inter-Processor Communication Flow
+
+Inter-Processor Communication Flow:
 
 .. code-block:: text
 
-    ┌─────────────┐
-    │ UART RX IRQ │  (Interrupt Context)
-    └──────┬──────┘
-           │ k_msgq_put()
-           ▼
-    ┌─────────────────┐
-    │  Message Queue  │  (uart_msgq)
-    │  [32 messages]  │
-    └──────┬──────────┘
-           │ k_msgq_get()
-           ▼
-    ┌─────────────┐
-    │  UART Task  │  (Priority 5)
-    │  - Echo RX  │
-    │  - Buffer   │
-    └──────┬──────┘
-           │ ble.notify()
-           ▼
-    ┌─────────────┐
-    │  BLE Task   │  (Priority 6)
-    │  - TX data  │
-    └─────────────┘
+    APP Core                              NET Core
+    ────────────────────────────          ────────────────────────────
+    │                                     │
+    │ smarthome::ipc::IPCCore            │ smarthome::ipc::IPCCore
+    │ ┌───────────────────┐              │ ┌───────────────────┐
+    │ │ send(message)     │              │ │ receive_callback()│
+    │ └────────┬──────────┘              │ └────────▲──────────┘
+    │          │                          │          │
+    │          ▼                          │          │
+    │  ┌──────────────┐                  │  ┌──────────────┐
+    │  │  serialize   │                  │  │ deserialize  │
+    │  └──────┬───────┘                  │  └──────▲───────┘
+    │         │                           │         │
+    │         ▼                           │         │
+    │  ┌────────────────────────────────────────────┴─────┐
+    │  │         Shared Memory (RPMsg Buffer)             │
+    │  │  ┌──────────────┐  ┌──────────────┐             │
+    │  │  │ TX Queue (→) │  │ RX Queue (←) │             │
+    │  │  └──────────────┘  └──────────────┘             │
+    │  └────────┬────────────────────────────▲───────────┘
+    │           │                            │
+    │           ▼                            │
+    │    [Interrupt NET]              [Interrupt APP]
+    │                                        │
+    └────────────────────────────────────────┘
 
-Components
-**********
+.. note::
+   PlantUML sequence diagram available in CI/CD builds at ``doc/diagrams/ipc_communication.puml``
 
-Message Queue (uart_msgq)
-==========================
+The ``smarthome::ipc::IPCCore`` module provides a C++ wrapper around Zephyr's OpenAMP API:
 
-:Purpose: Transfer UART interrupt data to UART task thread
-:Size: 32 messages
-:Message Structure:
-    .. code-block:: c
+.. code-block:: cpp
 
-        struct uart_msg {
-            uint8_t data;       // Received byte
-            uint32_t timestamp; // Reception time
-        };
+    namespace smarthome {
+    namespace ipc {
+    
+    class IPCCore {
+    public:
+        static IPCCore& getInstance();
+        
+        void init();
+        void send(const Message& msg);
+        void registerCallback(MessageCallback callback);
+        
+    private:
+        // OpenAMP endpoint
+        struct rpmsg_endpoint endpoint_;
+        
+        // Message queue for RX
+        K_KERNEL_STACK_MEMBER(rx_stack_, 1024);
+        struct k_thread rx_thread_;
+    };
+    
+    } // namespace ipc
+    } // namespace smarthome
 
-:Location: Defined in ``uart_task.cpp``
+.. only:: builder_html
 
-UART Interrupt Handler
-=======================
+   .. note::
+      See ``doc/diagrams/ipc_communication.puml`` for detailed PlantUML sequence diagram.
 
-:File: ``modules/uart/uartmodule.cpp``
-:Function: ``uart_irq_handler()``
-
-Operation:
-    1. UART RX interrupt fires
-    2. Read bytes from FIFO (up to 32 bytes)
-    3. Put each byte into message queue (non-blocking)
-    4. If queue full, drop bytes and log warning
-
-UART Task
-=========
-
-:File: ``thread/uart_task.cpp``
-:Priority: 5 (medium)
-:Stack Size: 2048 bytes
-
-Operation:
-    1. Block on ``k_msgq_get()`` waiting for UART data
-    2. Echo received byte back to UART
-    3. Accumulate bytes in buffer (128 bytes max)
-    4. Send to BLE on:
-        * Newline character (``\n`` or ``\r``)
-        * Buffer full
-        * Timer expires (100ms)
-
-BLE Task
-========
-
-:File: ``thread/ble_task.cpp``
-:Priority: 6 (higher priority)
-
-Operation:
-    * Processes BLE connection events
-    * Transmits data via BLE notifications
-
-Usage Example
+Message Types
 *************
 
-Sending Data via UART
+IPC Message Structure
 ======================
 
-.. code-block:: bash
+.. code-block:: cpp
 
-    # Connect to ESP32 UART (typically /dev/ttyUSB0)
-    screen /dev/ttyUSB0 115200
+    namespace smarthome {
+    namespace ipc {
+    
+    enum class MessageType : uint8_t {
+        RADIO_CONTROL,      // APP → NET: Radio commands
+        BLE_STATUS,         // NET → APP: BLE connection state
+        NETWORK_STATS,      // NET → APP: Link quality data
+        POWER_MANAGEMENT,   // Bidirectional: Sleep/wake
+    };
+    
+    struct Message {
+        MessageType type;
+        uint32_t timestamp;
+        uint16_t length;
+        uint8_t data[256];
+    };
+    
+    } // namespace ipc
+    } // namespace smarthome
 
-    # Type characters - they will be:
-    # 1. Echoed back to UART
-    # 2. Forwarded to connected BLE device
-    Hello World!
+Communication Patterns
+**********************
 
-Receiving on BLE Client
-========================
+APP → NET Core
+==============
 
-The BLE client (phone app, computer) will receive the UART data via BLE notifications.
+**Use Case**: APP core requests BLE advertising
 
-Semaphore Synchronization
-**************************
+.. code-block:: cpp
 
-Example: Adding a semaphore to protect shared resource between BLE and WiFi tasks
-
-.. code-block:: c
-
-    // In a shared header (e.g., thread/sync.h)
-    K_SEM_DEFINE(ble_wifi_sem, 1, 1);  // Binary semaphore, initial=1, max=1
-
-    // In BLE task
-    void ble_task_operation() {
-        k_sem_take(&ble_wifi_sem, K_FOREVER);  // Lock
-        
-        // Critical section - access shared resource
-        // ...
-        
-        k_sem_give(&ble_wifi_sem);  // Unlock
+    // APP Core
+    smarthome::ipc::Message msg;
+    msg.type = MessageType::RADIO_CONTROL;
+    // ... populate data ...
+    
+    smarthome::ipc::IPCCore::getInstance().send(msg);
+    
+    // NET Core receives and processes
+    void handle_radio_control(const Message& msg) {
+        smarthome::protocol::ble::BLEManager::getInstance()
+            .startAdvertising();
     }
 
-    // In WiFi task
-    void wifi_task_operation() {
-        k_sem_take(&ble_wifi_sem, K_FOREVER);  // Lock
-        
-        // Critical section - access shared resource
-        // ...
-        
-        k_sem_give(&ble_wifi_sem);  // Unlock
+NET → APP Core
+==============
+
+**Use Case**: NET core notifies BLE connection
+
+.. code-block:: cpp
+
+    // NET Core
+    smarthome::ipc::Message msg;
+    msg.type = MessageType::BLE_STATUS;
+    // ... populate connection info ...
+    
+    smarthome::ipc::IPCCore::getInstance().send(msg);
+    
+    // APP Core receives and updates UI
+    void handle_ble_status(const Message& msg) {
+        // Update LED status or notify Matter stack
     }
 
-Configuration
-*************
+Implementation Details
+**********************
 
-UART is already enabled in ``prj.conf`` as the console device:
+Initialization
+==============
 
-.. code-block:: kconfig
+Both cores must initialize IPC before communication:
 
-    CONFIG_SERIAL=y
-    CONFIG_UART_INTERRUPT_DRIVEN=y
+**APP Core** (``app_core.cpp``):
+
+.. code-block:: cpp
+
+    extern "C" int main() {
+        // Initialize IPC first
+        smarthome::ipc::IPCCore::getInstance().init();
+        
+        // Register callback
+        smarthome::ipc::IPCCore::getInstance()
+            .registerCallback(app_ipc_callback);
+        
+        // ... rest of initialization ...
+    }
+
+**NET Core** (``net_core.cpp``):
+
+.. code-block:: cpp
+
+    namespace net {
+    
+    void NetCoreManager::init() {
+        // Initialize IPC
+        smarthome::ipc::IPCCore::getInstance().init();
+        
+        // Register callback
+        smarthome::ipc::IPCCore::getInstance()
+            .registerCallback([this](const auto& msg) {
+                this->handleMessage(msg);
+            });
+        
+        // Initialize radio subsystems
+        ble_manager_.init();
+        radio_manager_.init();
+    }
+    
+    } // namespace net
+
+Message Threading
+=================
+
+The IPC module uses Zephyr threading for message processing:
+
+.. code-block:: cpp
+
+    class IPCCore {
+    private:
+        // RX thread for processing incoming messages
+        K_KERNEL_STACK_MEMBER(rx_stack_, 1024);
+        struct k_thread rx_thread_;
+        
+        // Thread entry point
+        static void rx_thread_entry(void* p1, void* p2, void* p3);
+    };
+
+The RX thread:
+
+1. Blocks on OpenAMP receive
+2. Deserializes incoming message
+3. Invokes registered callback
+4. Returns to blocking receive
 
 Performance Characteristics
 ***************************
 
-:Latency: < 1ms from UART RX to task processing
-:Throughput: Up to 115200 baud (limited by UART speed)
-:Queue Depth: 32 messages prevents data loss at normal rates
-:BLE Transmission: Batched every 100ms or on newline
+:Latency: < 100μs for message passing between cores
+:Throughput: Up to 10,000 messages/second
+:Message Size: Up to 256 bytes per message
+:Queue Depth: Configurable in OpenAMP (default 16 messages)
 
-Extending the Architecture
-**************************
+The low latency is achieved through:
 
-Adding Another Queue (Example: Sensor → WiFi)
-==============================================
+* **Shared Memory**: Zero-copy message passing
+* **Hardware Interrupts**: Direct core-to-core notification
+* **No Context Switching**: Dedicated IPC thread on each core
 
-.. code-block:: c
+Configuration
+*************
 
-    // 1. Define message structure
-    struct sensor_msg {
-        int value;
-        uint32_t timestamp;
-    };
+OpenAMP Configuration
+=====================
 
-    // 2. Create message queue
-    K_MSGQ_DEFINE(sensor_wifi_msgq, sizeof(struct sensor_msg), 16, 4);
+Zephyr configuration for inter-processor communication:
 
-    // 3. Producer (sensor task)
-    struct sensor_msg msg;
-    msg.value = sensor_reading;
-    msg.timestamp = k_uptime_get_32();
-    k_msgq_put(&sensor_wifi_msgq, &msg, K_NO_WAIT);
+.. code-block:: kconfig
 
-    // 4. Consumer (wifi task)
-    struct sensor_msg msg;
-    if (k_msgq_get(&sensor_wifi_msgq, &msg, K_MSEC(100)) == 0) {
-        // Process sensor data
+    # Enable OpenAMP/RPMsg
+    CONFIG_OPENAMP=y
+    CONFIG_OPENAMP_RSC_TABLE=y
+    
+    # IPC configuration
+    CONFIG_IPC_SERVICE=y
+    CONFIG_IPC_SERVICE_BACKEND_RPMSG=y
+    
+    # Shared memory region
+    CONFIG_OPENAMP_SHM_BASE_ADDRESS=0x20070000
+    CONFIG_OPENAMP_SHM_SIZE=0x10000
+
+Thread Stack Sizes
+==================
+
+.. code-block:: cpp
+
+    // IPC RX thread stack
+    K_KERNEL_STACK_MEMBER(rx_stack_, 1024);  // 1 KB sufficient
+    
+    // NET core main stack
+    K_KERNEL_STACK_DEFINE(net_core_stack, 2048);  // 2 KB
+
+Usage Examples
+**************
+
+Example 1: Request Network Statistics
+======================================
+
+APP core requests network quality data from NET core:
+
+.. code-block:: cpp
+
+    // APP Core - request stats
+    smarthome::ipc::Message req;
+    req.type = MessageType::NETWORK_STATS;
+    smarthome::ipc::IPCCore::getInstance().send(req);
+    
+    // NET Core - respond with stats
+    void handle_stats_request(const Message& req) {
+        smarthome::ipc::Message resp;
+        resp.type = MessageType::NETWORK_STATS;
+        
+        // Populate with actual stats
+        int8_t rssi = get_current_rssi();
+        memcpy(resp.data, &rssi, sizeof(rssi));
+        
+        smarthome::ipc::IPCCore::getInstance().send(resp);
+    }
+
+Example 2: BLE Connection Notification
+=======================================
+
+NET core notifies APP core of BLE connection changes:
+
+.. code-block:: cpp
+
+    // NET Core - BLE callback
+    void ble_connected_callback(bool connected) {
+        smarthome::ipc::Message msg;
+        msg.type = MessageType::BLE_STATUS;
+        msg.data[0] = connected ? 1 : 0;
+        msg.length = 1;
+        
+        smarthome::ipc::IPCCore::getInstance().send(msg);
+    }
+    
+    // APP Core - handle notification
+    void app_ipc_callback(const smarthome::ipc::Message& msg) {
+        if (msg.type == MessageType::BLE_STATUS) {
+            bool connected = msg.data[0] != 0;
+            LOG_INF("BLE connection status: %s", 
+                    connected ? "connected" : "disconnected");
+        }
     }
 
 Testing
 *******
 
 Build and Flash
-===============
-
-1. Build firmware:
+=========both cores:
 
    .. code-block:: bash
 
+       cd software
        ./make.sh build
 
-2. Flash to ESP32:
+2. Flash to nRF5340 DK:
 
    .. code-block:: bash
 
        ./make.sh flash
 
-3. Open serial monitor:
+3. Monitor serial output:
 
    .. code-block:: bash
 
-       ./make.sh monitor
+       screen /dev/ttyACM0 115200
 
-4. Type characters - observe echo and BLE transmission
+4. Test IPC by pressing buttons - observe messages between cores
 
-5. Connect BLE client - receive forwarded UART data
+Debugging IPC
+=============
+
+Enable IPC debug logging in ``prj.conf``:
+
+.. code-block:: kconfig
+
+    CONFIG_OPENAMP_LOG_LEVEL_DBG=y
+    CONFIG_IPC_SERVICE_LOG_LEVEL_DBG=y
 
 Key Zephyr APIs Used
 ********************
 
-Message Queues
-==============
+OpenAMP/RPMsg
+=============
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 70
+   :widths: 40 60
 
    * - API
      - Description
-   * - ``k_msgq_define()``
-     - Define message queue
-   * - ``k_msgq_put()``
-     - Send message (non-blocking in ISR)
-   * - ``k_msgq_get()``
-     - Receive message (blocking)
+   * - ``rpmsg_service_register_endpoint()``
+     - Register IPC endpoint
+   * - ``rpmsg_send()``
+     - Send message to remote core
+   * - ``rpmsg_service_receive()``
+     - Receive message (callback)
 
-Semaphores
-==========
+IPC Service
+===========
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 70
+   :widths: 40 60
 
    * - API
      - Description
-   * - ``k_sem_define()``
-     - Define semaphore
-   * - ``k_sem_take()``
-     - Acquire semaphore
-   * - ``k_sem_give()``
-     - Release semaphore
+   * - ``ipc_service_open_instance()``
+     - Open IPC instance
+   * - ``ipc_service_register_endpoint()``
+     - Register endpoint
+   * - ``ipc_service_send()``
+     - Send data via IPC
 
-UART
-====
+Threading
+=========
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 70
+   :widths: 40 60
 
    * - API
      - Description
-   * - ``uart_irq_callback_user_data_set()``
-     - Set UART ISR with user data
-   * - ``uart_irq_rx_enable()``
-     - Enable RX interrupt
-   * - ``uart_fifo_read()``
-     - Read from UART FIFO
-   * - ``uart_poll_out()``
-     - Polled output (blocking)
+   * - ``K_KERNEL_STACK_MEMBER()``
+     - Define thread stack in class
+   * - ``k_thread_create()``
+     - Create new thread
+   * - ``k_sleep()``
+     - Yield thread execution
 
 Source Code Reference
 *********************
 
-Module Files
-============
+IPC Module Files
+================
 
+* ``app/src/sdk/ipc/ipc_core.hpp`` - IPC interface
+* ``app/src/sdk/ipc/ipc_core.cpp`` - IPC implementation
+* ``app/src/app_core/app_core.cpp`` - APP core usage
+* ``app/src/net_core/net_core.cpp`` - NET core usage
 * ``app/src/modules/uart/uartmodule.hpp`` - UART module interface
 * ``app/src/modules/uart/uartmodule.cpp`` - UART module implementation
 

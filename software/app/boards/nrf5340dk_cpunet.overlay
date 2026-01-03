@@ -10,7 +10,14 @@
 	/* NET core manages radio for Thread (802.15.4) and BLE */
 	chosen {
 		zephyr,ieee802154 = &ieee802154;
+		zephyr,ipc = &ipc0;
+		zephyr,ipc-shm = &sram0_shared;
 	};
+};
+
+/* Shared memory region for IPC (must match APP core) */
+&sram0_shared {
+	reg = <0x20070000 0x10000>;
 };
 
 /* Enable IEEE 802.15.4 radio for OpenThread */
@@ -20,5 +27,10 @@
 
 /* IPC for communication with APP core */
 &ipc0 {
+	status = "okay";
+};
+
+/* MBOX for IPC service */
+&mbox {
 	status = "okay";
 };

@@ -22,6 +22,29 @@ extensions = [
     'sphinx.ext.viewcode',
 ]
 
+# Try to add PlantUML extension if available
+plantuml_available = False
+try:
+    import sphinxcontrib.plantuml
+    extensions.append('sphinxcontrib.plantuml')
+    plantuml_available = True
+    
+    # PlantUML configuration - fallback to plantuml command if jar not found
+    import shutil
+    if shutil.which('plantuml'):
+        plantuml = 'plantuml'
+    else:
+        plantuml = 'java -jar /usr/share/plantuml/plantuml.jar'
+    plantuml_output_format = 'svg'
+except ImportError:
+    # PlantUML not available - will use ASCII fallback diagrams
+    pass
+
+# Make PlantUML availability known to templates
+html_context = {
+    'plantuml_available': plantuml_available
+}
+
 templates_path = ['_templates']
 
 # Exclude patterns - do not include README, CI/CD, or build artifacts
@@ -53,6 +76,11 @@ html_theme_options = {
     'sticky_navigation': True,
     'titles_only': False,
 }
+
+# Custom CSS for diagram scaling
+html_css_files = [
+    'custom.css',
+]
 
 # -- Options for Intersphinx -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html

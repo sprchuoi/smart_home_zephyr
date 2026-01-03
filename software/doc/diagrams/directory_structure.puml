@@ -1,0 +1,41 @@
+@startuml directory_structure
+skinparam backgroundColor #FFFFFF
+skinparam packageStyle rectangle
+skinparam defaultFontSize 11
+
+title Source Code Directory Structure
+
+package "src/" {
+    package "app_core/" #LightBlue {
+        folder "app_core.cpp"
+        folder "cpp_support.cpp"
+    }
+    
+    package "net_core/" #LightPink {
+        folder "net_core.cpp"
+    }
+    
+    package "sdk/" #LightGreen {
+        package "protocol/" {
+            folder "matter/"
+            folder "thread/"
+            folder "ble/"
+            folder "radio/"
+        }
+        
+        package "hw/" {
+            folder "button/"
+            folder "uart/"
+        }
+        
+        package "ipc/" {
+            folder "ipc_core.cpp"
+        }
+        
+        package "services/" {
+            folder "wakeword/"
+        }
+    }
+}
+
+@enduml

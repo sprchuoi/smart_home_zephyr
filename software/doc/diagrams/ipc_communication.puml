@@ -1,0 +1,67 @@
+@startuml ipc_communication
+skinparam backgroundColor #FFFFFF
+
+title Inter-Processor Communication (IPC)
+
+participant "APP Core\napp_core.cpp" as App #LightBlue
+participant "IPC Core (APP)\nsmarthome::ipc" as IPCApp #Orange
+box "Shared Memory" #LightGray
+    queue "RPMsg Channel" as RPMsg
+end box
+participant "IPC Core (NET)\nsmarthome::ipc" as IPCNet #Orange
+participant "NET Core\nnet_core.cpp" as Net #LightPink
+
+== Initialization ==
+App -> IPCApp : init()
+activate IPCApp
+IPCApp -> RPMsg : create endpoint
+RPMsg --> IPCApp : ready
+deactivate IPCApp
+
+Net -> IPCNet : init()
+activate IPCNet
+IPCNet -> RPMsg : create endpoint
+RPMsg --> IPCNet : ready
+deactivate IPCNet
+
+== Message Sending (APP → NET) ==
+App -> IPCApp : send(message)
+activate IPCApp
+IPCApp -> IPCApp : serialize message
+IPCApp -> RPMsg : rpmsg_send()
+note right
+  Non-blocking send
+  OpenAMP handles buffering
+end note
+RPMsg -> IPCNet : interrupt NET core
+deactivate IPCApp
+
+IPCNet -> RPMsg : receive callback
+activate IPCNet
+IPCNet -> IPCNet : deserialize message
+IPCNet -> Net : notify(message)
+deactivate IPCNet
+
+== Message Sending (NET → APP) ==
+Net -> IPCNet : send(message)
+activate IPCNet
+IPCNet -> IPCNet : serialize message
+IPCNet -> RPMsg : rpmsg_send()
+RPMsg -> IPCApp : interrupt APP core
+deactivate IPCNet
+
+IPCApp -> RPMsg : receive callback
+activate IPCApp
+IPCApp -> IPCApp : deserialize message
+IPCApp -> App : notify(message)
+deactivate IPCApp
+
+note over App, Net
+  **IPC Message Types:**
+  - Radio control commands
+  - BLE status updates
+  - Network statistics
+  - Power management
+end note
+
+@enduml

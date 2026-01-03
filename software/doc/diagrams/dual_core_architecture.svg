@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="461px" preserveAspectRatio="none" style="width:454px;height:461px;" version="1.1" viewBox="0 0 454 461" width="454px" zoomAndPan="magnify"><defs><filter height="300%" id="f2su9cfvugsbp" width="300%" x="-1" y="-1"><feGaussianBlur result="blurOut" stdDeviation="2.0"/><feColorMatrix in="blurOut" result="blurOut2" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .4 0"/><feOffset dx="4.0" dy="4.0" in="blurOut2" result="blurOut3"/><feBlend in="SourceGraphic" in2="blurOut3" mode="normal"/></filter></defs><g><text fill="#000000" font-family="sans-serif" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="180" x="143" y="10.2104">nRF5340 Dual-Core Architecture</text><!--MD5=[4b75a8c45955889c019af6ea18cf67a5]
+cluster APP--><polygon fill="#ADD8E6" filter="url(#f2su9cfvugsbp)" points="22,36.8047,155,36.8047,162,55.6094,264,55.6094,264,227.8047,22,227.8047,22,36.8047" style="stroke: #000000; stroke-width: 1.5;"/><line style="stroke: #000000; stroke-width: 1.5;" x1="22" x2="162" y1="55.6094" y2="55.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="127" x="26" y="49.0151">APP Core (128 MHz)</text><!--MD5=[c2b98116a3d4a36ec3e53037c9107dae]
+cluster NET--><polygon fill="#FFB6C1" filter="url(#f2su9cfvugsbp)" points="296,147.8047,422,147.8047,429,166.6094,432,166.6094,432,336.8047,296,336.8047,296,147.8047" style="stroke: #000000; stroke-width: 1.5;"/><line style="stroke: #000000; stroke-width: 1.5;" x1="296" x2="429" y1="166.6094" y2="166.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="120" x="300" y="160.0151">NET Core (64 MHz)</text><!--MD5=[3688f675207e3005a65a2256020f350d]
+cluster SDK--><polygon fill="#90EE90" filter="url(#f2su9cfvugsbp)" points="182,369.8047,272,369.8047,279,388.6094,296,388.6094,296,449.8047,182,449.8047,182,369.8047" style="stroke: #000000; stroke-width: 1.5;"/><line style="stroke: #000000; stroke-width: 1.5;" x1="182" x2="279" y1="388.6094" y2="388.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="84" x="186" y="382.0151">SDK (shared)</text><!--MD5=[48cef55b3a07a0e2916c90a840524e82]
+entity MT--><rect fill="#90EE90" filter="url(#f2su9cfvugsbp)" height="32.8047" style="stroke: #A80036; stroke-width: 1.5;" width="100" x="148" y="67.8047"/><rect fill="#90EE90" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="143" y="72.8047"/><rect fill="#90EE90" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="143" y="90.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="80" x="158" y="88.0151">Matter/Thread</text><!--MD5=[0c115fbe6776d76edb00007f346e8b2d]
+entity HW--><rect fill="#F08080" filter="url(#f2su9cfvugsbp)" height="32.8047" style="stroke: #A80036; stroke-width: 1.5;" width="75" x="37.5" y="67.8047"/><rect fill="#F08080" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="32.5" y="72.8047"/><rect fill="#F08080" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="32.5" y="90.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="55" x="47.5" y="88.0151">Hardware</text><!--MD5=[088473e9086f9c9f5328fbf8eae6c53b]
+entity IPC_APP--><rect fill="#FFA500" filter="url(#f2su9cfvugsbp)" height="32.8047" style="stroke: #A80036; stroke-width: 1.5;" width="38" x="175" y="178.8047"/><rect fill="#FFA500" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="170" y="183.8047"/><rect fill="#FFA500" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="170" y="201.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="18" x="185" y="199.0151">IPC</text><!--MD5=[b1a30bf5c23d3030e9891f7dcf6c4011]
+entity BR--><rect fill="#FFB6C1" filter="url(#f2su9cfvugsbp)" height="32.8047" style="stroke: #A80036; stroke-width: 1.5;" width="76" x="314" y="178.8047"/><rect fill="#FFB6C1" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="309" y="183.8047"/><rect fill="#FFB6C1" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="309" y="201.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="56" x="324" y="199.0151">BLE/Radio</text><!--MD5=[31465b9ffc027cf52aaf939f36fcb61e]
+entity IPC_NET--><rect fill="#FFA500" filter="url(#f2su9cfvugsbp)" height="32.8047" style="stroke: #A80036; stroke-width: 1.5;" width="38" x="314" y="287.8047"/><rect fill="#FFA500" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="309" y="292.8047"/><rect fill="#FFA500" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="309" y="310.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="18" x="324" y="308.0151">IPC</text><!--MD5=[5aab194621b4407388d2dd24172a006a]
+entity IPC_LIB--><rect fill="#FEFECE" filter="url(#f2su9cfvugsbp)" height="32.8047" style="stroke: #A80036; stroke-width: 1.5;" width="81" x="198.5" y="400.8047"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="193.5" y="405.8047"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="193.5" y="423.6094"/><text fill="#000000" font-family="sans-serif" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="61" x="208.5" y="421.0151">IPC Library</text><!--MD5=[e149126b12c0efd8e49c853225e698a9]
+link MT to IPC_APP--><path d="M197.43,100.9247 C196.73,120.0247 195.54,152.4247 194.76,173.5947 " fill="none" id="MT-&gt;IPC_APP" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="194.57,178.7147,198.9022,169.8698,194.7561,173.7182,190.9078,169.572,194.57,178.7147" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[8d277a3619355437dc05b7c900e0a20c]
+link HW to IPC_APP--><path d="M92.05,100.9247 C113.43,120.5047 150.08,154.0747 173.13,175.1847 " fill="none" id="HW-&gt;IPC_APP" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="176.98,178.7147,173.0406,169.688,173.2913,175.3393,167.64,175.59,176.98,178.7147" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[a9cc235f0cdb16ff0a414604fb00fb9a]
+link BR to IPC_NET--><path d="M352.07,211.8647 C351.87,224.3747 351,242.3647 348,257.8047 C346.4,266.0347 343.74,274.8247 341.1,282.4747 " fill="none" id="BR-&gt;IPC_NET" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="339.28,287.5647,346.0767,280.437,340.9635,282.8566,338.5438,277.7434,339.28,287.5647" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[142f71c4c27c0f8f4d1553a4668d01f6]
+link IPC_APP to IPC_NET--><path d="M206.96,216.2547 C216.14,229.2747 229.39,245.9847 244,257.8047 C263.9,273.9047 290.41,286.5547 309.31,294.3947 " fill="none" id="IPC_APP-IPC_NET" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="313.95,296.2747,307.1244,289.1746,309.3195,294.3882,304.106,296.5834,313.95,296.2747" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="204,211.9947,205.8254,221.6729,206.8423,216.1082,212.407,217.1252,204,211.9947" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="94" x="245" y="255.0151">RPMsg/OpenAMP</text><!--MD5=[1d2a7b6a7cd6c34889fadade1261604e]
+link IPC_APP to IPC_LIB--><path d="M197.24,212.1247 C205.21,251.1347 225.83,351.8947 234.76,395.5847 " fill="none" id="IPC_APP-&gt;IPC_LIB" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="235.79,400.6247,237.9096,391.0066,234.7902,395.7257,230.0711,392.6063,235.79,400.6247" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[84ada0b18fc79fbf8a0602afcd840824]
+link IPC_NET to IPC_LIB--><path d="M319.53,321.2047 C302.61,341.1847 273.6,375.4447 255.41,396.9347 " fill="none" id="IPC_NET-&gt;IPC_LIB" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="252.14,400.7847,261.0077,396.4995,255.3704,396.9683,254.9015,391.3309,252.14,400.7847" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[c717c13b79279fa20b5e5f12effeaf08]
+@startuml dual_core_architecture
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+
+title nRF5340 Dual-Core Architecture
+
+package "APP Core (128 MHz)" as APP #LightBlue {
+    component [Matter/Thread] as MT #LightGreen
+    component [Hardware] as HW #LightCoral
+    component [IPC] as IPC_APP #Orange
+}
+
+package "NET Core (64 MHz)" as NET #LightPink {
+    component [BLE/Radio] as BR #LightPink
+    component [IPC] as IPC_NET #Orange
+}
+
+package "SDK (shared)" as SDK #LightGreen {
+    component [IPC Library] as IPC_LIB
+}
+
+MT - -> IPC_APP
+HW - -> IPC_APP
+BR - -> IPC_NET
+IPC_APP <- -> IPC_NET : RPMsg/OpenAMP
+IPC_APP - -> IPC_LIB
+IPC_NET - -> IPC_LIB
+
+@enduml
+
+PlantUML version 1.2020.02(Sun Mar 01 17:22:07 ICT 2020)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Java Version: 21.0.9+10-Ubuntu-124.04
+Operating System: Linux
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

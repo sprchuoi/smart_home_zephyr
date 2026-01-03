@@ -27,6 +27,12 @@ jobs:
           wget --no-verbose "https://github.com/doxygen/doxygen/releases/download/Release_${DOXYGEN_VERSION//./_}/doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz"
           tar xf doxygen-${DOXYGEN_VERSION}.linux.bin.tar.gz
           echo "${PWD}/doxygen-${DOXYGEN_VERSION}/bin" >> $GITHUB_PATH
+          
+          # Install PlantUML
+          sudo apt-get update
+          sudo apt-get install -y plantuml
+          
+          # Install Python dependencies
           pip install -r software/doc/requirements.txt
           pip install sphinx-rtd-theme
 

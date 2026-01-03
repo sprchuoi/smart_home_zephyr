@@ -1,0 +1,30 @@
+@startuml dual_core_architecture
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam defaultFontSize 11
+
+title nRF5340 Dual-Core Architecture
+
+package "APP Core (128 MHz)" as APP #LightBlue {
+    component [Matter/Thread] as MT #LightGreen
+    component [Hardware] as HW #LightCoral
+    component [IPC] as IPC_APP #Orange
+}
+
+package "NET Core (64 MHz)" as NET #LightPink {
+    component [BLE/Radio] as BR #LightPink
+    component [IPC] as IPC_NET #Orange
+}
+
+package "SDK (shared)" as SDK #LightGreen {
+    component [IPC Library] as IPC_LIB
+}
+
+MT --> IPC_APP
+HW --> IPC_APP
+BR --> IPC_NET
+IPC_APP <--> IPC_NET : RPMsg/OpenAMP
+IPC_APP --> IPC_LIB
+IPC_NET --> IPC_LIB
+
+@enduml
