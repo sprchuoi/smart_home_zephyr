@@ -21,7 +21,6 @@ Architecture Diagram
 
 .. uml:: diagrams/dual_core_architecture.puml
    :align: center
-   :width: 600px
    :caption: nRF5340 Dual-Core System Architecture
 
 Hardware Resources
@@ -90,7 +89,6 @@ Namespace Hierarchy
 
 .. uml:: diagrams/namespace_hierarchy.puml
    :align: center
-   :width: 600px
    :caption: C++ Namespace Structure
 
 .. code-block:: text
@@ -157,7 +155,6 @@ The two cores communicate via **RPMsg/OpenAMP** protocol.
 
 .. uml:: diagrams/ipc_communication.puml
    :align: center
-   :width: 600px
    :caption: Inter-Processor Communication Sequence
 
 Hardware interrupts for low latency
@@ -201,7 +198,6 @@ Directory Structure
 
 .. uml:: diagrams/directory_structure.puml
    :align: center
-   :width: 600px
    :caption: Source Code Organization
 
 .. code-block:: text

@@ -26,7 +26,6 @@ IPC Architecture
 
 .. uml:: diagrams/ipc_communication.puml
    :align: center
-   :width: 600px
    :caption: Inter-Processor Communication Flow
 
 Inter-Processor Communication Flow:
