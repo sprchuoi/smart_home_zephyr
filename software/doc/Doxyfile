@@ -919,7 +919,9 @@ WARN_LOGFILE           =
 
 INPUT                  = _doxygen/main.md \
                          _doxygen/groups.dox \
-                         ../include
+                         ../app/src/sdk \
+                         ../app/src/app_core \
+                         ../app/src/net_core
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
