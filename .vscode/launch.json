@@ -2,12 +2,40 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "West Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "preLaunchTask": "west-debug",
+            "miDebuggerPath": "/home/sprchuoi/zephyr-sdk-0.17.4/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+            "program": "${workspaceFolder}/software/app/build_app/zephyr/zephyr.elf",
+            "cwd": "${workspaceFolder}/software",
+            "MIMode": "gdb",
+            "stopAtEntry": true,
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Break at app_core_init (early boot)",
+                    "text": "break app_core_init",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Break at main",
+                    "text": "break main",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "West Debug - APP Core",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/software/app/build_app/zephyr/zephyr.elf",
             "args": [],
-            "stopAtEntry": false,
+            "stopAtEntry": true,
             "cwd": "${workspaceFolder}/software",
             "environment": [],
             "externalConsole": false,
@@ -74,10 +102,7 @@
                 "trace": false,
                 "traceResponse": false,
                 "engineLogging": false
-            },
-            "sourceLanguages": ["cpp", "c"],
-            "symbolSearchPath": "${workspaceFolder}/software/app/build_app/zephyr",
-            "additionalProperties": {}
+            }
         },
         {
             "name": "GDB Debug - APP Core (Connected)",

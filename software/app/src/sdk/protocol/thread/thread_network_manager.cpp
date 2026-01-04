@@ -1,10 +1,10 @@
 /*
- * Copyright (c) 2024 Nordic Semiconductor ASA
+ * Copyright (c) 2025 Sprchuoi
  * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "thread_network_manager.hpp"
-#include "../matter/chip_config.hpp"
+#include "../matter/commission/chip_config.hpp"
 #include "network_resilience_manager.hpp"
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>

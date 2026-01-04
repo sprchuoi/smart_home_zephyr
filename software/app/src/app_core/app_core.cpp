@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Nordic Semiconductor ASA
+ * Copyright (c) 2025 Sprchuoi
  * SPDX-License-Identifier: Apache-2.0
  *
  * ============================================================================
@@ -24,25 +24,8 @@
  *   - BLE commissioning (shared radio)
  */
 
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/uart.h>
-#include <zephyr/sys/printk.h>
-#include <app_version.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "app_core.hpp"
 
-/* Protocol layer includes */
-#include "sdk/protocol/matter/app_task.hpp"
-#include "sdk/protocol/matter/light_endpoint.hpp"
-
-/* Hardware abstraction layer */
-#include "sdk/hw/button/button_manager.hpp"
-#include "sdk/hw/uart/uart_manager.hpp"
-
-/* IPC for inter-core communication */
-#include "sdk/ipc/ipc_core.hpp"
 
 LOG_MODULE_REGISTER(app_core, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -76,6 +59,23 @@ static void on_button_pressed(uint8_t button_id)
 		return;
 	}
 	
+	// Button 0 long press: Factory reset
+	// Short press: Toggle LED
+	static uint32_t button0_press_time = 0;
+	
+	if (button_id == 0) {
+		uint32_t press_duration = k_uptime_get_32() - button0_press_time;
+		
+		// If held for >5 seconds, trigger factory reset
+		if (press_duration > 5000 && button0_press_time != 0) {
+			LOG_WRN("Factory reset triggered by button 0 long press!");
+			smarthome::protocol::matter::AppTask::getInstance().factoryReset();
+			return;
+		}
+		
+		button0_press_time = k_uptime_get_32();
+	}
+	
 	/* Toggle LED state */
 	led_state[button_id] = !led_state[button_id];
 	gpio_pin_set_dt(&leds[button_id], led_state[button_id] ? 1 : 0);
@@ -86,6 +86,11 @@ static void on_button_pressed(uint8_t button_id)
 	/* Notify Matter stack of state change */
 	smarthome::protocol::matter::LightEndpoint::getInstance().setLightState(led_state[button_id]);
 }
+
+/* Forward declarations */
+static int app_core_init_gpio(void);
+
+static int app_core_init_apptask(void);
 
 /*
  * IPC message handlers - receive data from NET core
@@ -174,6 +179,32 @@ static int app_core_init(void)
 		/* Continue anyway - IPC is optional */
 	}
 	
+	ret = app_core_init_gpio();
+
+	ret = app_core_init_apptask();
+	
+	
+	LOG_INF("APP Core initialization complete!");
+	LOG_INF("Waiting for Matter commissioning...");
+	
+	return ret;
+}
+
+static int app_core_init_apptask(void){
+	/* Initialize Matter application task */
+	LOG_INF("Initializing Matter stack...");
+	int ret = smarthome::protocol::matter::AppTask::getInstance().init();
+	if (ret < 0) {
+		LOG_ERR("Failed to initialize Matter AppTask: %d", ret);
+		return ret;
+	}
+	LOG_INF("Matter stack initialized");
+}
+
+
+
+static int app_core_init_gpio(void){
+	int ret;
 	/* Initialize all 4 LEDs and turn them ON to verify GPIO works */
 	for (int i = 0; i < NUM_LEDS; i++) {
 		if (!device_is_ready(leds[i].port)) {
@@ -226,11 +257,7 @@ static int app_core_init(void)
 		}
 		LOG_INF("Button manager initialized with %d button(s)", btnMgr.getButtonCount());
 	}
-	
-	LOG_INF("APP Core initialization complete!");
-	LOG_INF("Waiting for Matter commissioning...");
-	
-	return 0;
+	return ret;
 }
 
 /*
@@ -238,11 +265,8 @@ static int app_core_init(void)
  */
 extern "C" int main(void)
 {
-	int ret = app_core_init();
-	if (ret < 0) {
-		LOG_ERR("APP Core initialization failed: %d", ret);
-		return ret;
-	}
+	// Note: app_core_init() is called via SYS_INIT before main()
+	// Initialization already complete at POST_KERNEL phase
 	
 	LOG_INF("APP Core main loop started");
 	LOG_INF("Listening for Matter events and button input...");

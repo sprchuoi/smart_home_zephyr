@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2024 Nordic Semiconductor ASA
+# Copyright (c) 2025 Sprchuoi
 # SPDX-License-Identifier: Apache-2.0
 #
 # Flash script for nRF5340 DK Matter Smart Light

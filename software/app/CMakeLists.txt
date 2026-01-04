@@ -2,7 +2,7 @@
 # nRF5340 DK Matter Smart Light - Dual-Core Build System
 #===============================================================================
 #
-# Copyright (c) 2024 Nordic Semiconductor ASA
+# Copyright (c) 2025 Sprchuoi
 # SPDX-License-Identifier: Apache-2.0
 #
 # Purpose:
@@ -48,9 +48,16 @@ if(CONFIG_SOC_NRF5340_CPUAPP)
         src/app_core/cpp_support.cpp
         
         # Shared SDK - Protocol layer (Matter + Thread)
-        src/sdk/protocol/matter/app_task.cpp
-        src/sdk/protocol/matter/light_endpoint.cpp
-        src/sdk/protocol/matter/commissioning_delegate.cpp
+        src/sdk/protocol/matter/control_app/app_task.cpp
+        src/sdk/protocol/matter/control_app/app_task_phase0.cpp
+        src/sdk/protocol/matter/control_app/app_task_phase1.cpp
+        src/sdk/protocol/matter/control_app/app_task_phase2.cpp
+        src/sdk/protocol/matter/control_app/app_task_phase3.cpp
+        src/sdk/protocol/matter/control_app/app_task_phase4.cpp
+        src/sdk/protocol/matter/control_app/app_task_phase5.cpp
+        src/sdk/protocol/matter/control_app/app_task_phase6.cpp
+        src/sdk/protocol/matter/light_endpoint/light_endpoint.cpp
+        src/sdk/protocol/matter/commission/commissioning_delegate.cpp
         src/sdk/protocol/thread/thread_network_manager.cpp
         src/sdk/protocol/thread/network_resilience_manager.cpp
         

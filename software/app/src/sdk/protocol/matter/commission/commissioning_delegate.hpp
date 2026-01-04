@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Nordic Semiconductor ASA
+ * Copyright (c) 2025 Sprchuoi
  * SPDX-License-Identifier: Apache-2.0
  *
  * Commissioning Delegate - Handles Matter commissioning flow
@@ -11,6 +11,9 @@
 #include <zephyr/kernel.h>
 
 namespace smarthome { namespace protocol { namespace matter {
+
+/// Callback type for commissioning completion
+using CommissioningCompleteCallback = void (*)(void);
 
 /**
  * Commissioning Delegate - BLE Commissioning Management
@@ -34,13 +37,6 @@ public:
 
     /**
      * Initialize commissioning delegate
-     * 
-     * TODO:
-     *  1. Setup commissioning window state management
-     *  2. Initialize BLE commissioning service
-     *  3. Register commissioning callbacks with CHIP stack
-     *  4. Setup commissioning timeout handler
-     *  5. Load discriminator and passcode from factory data
      */
     int init();
 
@@ -49,14 +45,6 @@ public:
      * 
      * @param timeout_sec Duration to keep commissioning open (seconds)
      * @return 0 on success
-     * 
-     * TODO:
-     *  1. Check if already commissioned
-     *  2. Start BLE advertisement with commissioning service
-     *  3. Setup discriminator in BLE advertisement
-     *  4. Setup commissioning timer (auto-close after timeout)
-     *  5. Update device state to COMMISSIONING
-     *  6. Log commissioning window opening with discriminator/PIN
      */
     int openCommissioningWindow(uint32_t timeout_sec);
 
@@ -64,12 +52,6 @@ public:
      * Close commissioning window
      * 
      * @return 0 on success
-     * 
-     * TODO:
-     *  1. Stop BLE advertisement
-     *  2. Cancel commissioning timeout timer
-     *  3. Update device state based on commissioned status
-     *  4. Log commissioning window closure
      */
     int closeCommissioningWindow();
 
@@ -81,37 +63,24 @@ public:
     bool isCommissioningOpen() const;
 
     /**
-     * Callback when fabric is added (device commissioned)
+     * Check if device is commissioned (has fabric)
      * 
-     * TODO:
-     *  1. Called by CHIP stack when fabric add succeeds
-     *  2. Save fabric info to NVS
-     *  3. Close commissioning window if open
-     *  4. Update device state to COMMISSIONED
-     *  5. Start attempting network join
+     * @return true if commissioned, false otherwise
+     */
+    bool isCommissioned() const;
+
+    /**
+     * Callback when fabric is added (device commissioned)
      */
     void onFabricAdded();
 
     /**
      * Callback when fabric is removed (factory reset)
-     * 
-     * TODO:
-     *  1. Called when all fabrics are removed
-     *  2. Clear stored fabric data
-     *  3. Update state to not commissioned
-     *  4. Close commissioning window
-     *  5. Trigger device cleanup
      */
     void onFabricRemoved();
 
     /**
      * Callback for commissioning completion
-     * 
-     * TODO:
-     *  1. Called when Matter commissioning succeeds
-     *  2. Save operational credentials to NVS
-     *  3. Setup network join attempt
-     *  4. Log successful commissioning
      */
     void onCommissioningComplete();
 
@@ -136,6 +105,15 @@ public:
      */
     uint32_t getTimeRemaining() const;
 
+    /**
+     * Set callback for commissioning completion
+     * 
+     * @param callback Function to call when commissioning completes
+     */
+    void setOnCommissioningComplete(CommissioningCompleteCallback callback) {
+        completion_callback_ = callback;
+    }
+
 private:
     CommissioningDelegate();
     ~CommissioningDelegate();
@@ -151,6 +129,9 @@ private:
 
     // Timeout timer
     struct k_timer commissioning_timer_;
+    
+    // Completion callback
+    CommissioningCompleteCallback completion_callback_;
 };
 
 }  // namespace matter

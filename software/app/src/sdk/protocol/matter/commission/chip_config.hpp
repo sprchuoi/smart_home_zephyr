@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Nordic Semiconductor ASA
+ * Copyright (c) 2025 Sprchuoi
  * SPDX-License-Identifier: Apache-2.0
  *
  * CHIP/Matter Configuration and Device Constants
@@ -55,7 +55,7 @@ constexpr uint32_t COMMISSIONING_BLE_INTERVAL_MS = 100;
 // Commissioning window timeout (seconds)
 // How long commissioning window stays open before closing
 constexpr uint32_t COMMISSIONING_WINDOW_TIMEOUT_SEC = 600;  // 10 minutes
-
+    
 // Maximum commissioning attempts before lockout
 constexpr uint8_t MAX_COMMISSIONING_ATTEMPTS = 10;
 
