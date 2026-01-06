@@ -6,6 +6,23 @@
  * Matter Smart Light with Thread networking - 4 LED control
  */
 
+&pinctrl {
+	i2c0_default: i2c0_default {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SDA, 0, 26)>,
+				<NRF_PSEL(TWIM_SCL, 0, 27)>;
+		};
+	};
+
+	i2c0_sleep: i2c0_sleep {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SDA, 0, 26)>,
+				<NRF_PSEL(TWIM_SCL, 0, 27)>;
+			low-power-enable;
+		};
+	};
+};
+
 / {
 	/* Aliases for Matter application - all 4 LEDs on DK */
 	aliases {
@@ -38,16 +55,18 @@
 	current-speed = <115200>;
 };
 
-/* SPI for future use (sensor/storage) */
+/* SPI for future use (sensor/storage) - disabled until pinctrl configured */
 &spi0 {
-	status = "okay";
+	status = "disabled";
 };
 
 /* I2C for sensors */
 &i2c0 {
+	compatible = "nordic,nrf-twim";
 	status = "okay";
-	sda-pin = <26>;
-	scl-pin = <27>;
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-1 = <&i2c0_sleep>;
+	pinctrl-names = "default", "sleep";
 };
 
 /* IPC mailbox for inter-core communication */
