@@ -22,9 +22,10 @@ int AppTask::initPhase1_IPC()
     
     // 1.2: Wait for IPC to be ready (max 5 seconds)
     int wait_count = 0;
-    while (!ipc::IPCCore::getInstance().isReady() && wait_count < 50) {
+    while (!ipc::IPCCore::getInstance().isReady() && wait_count < DEFAULT_WAIT_IPC_READY_MS/100) //  50 attempts
+    {
         k_sleep(K_MSEC(100));
-        wait_count++;
+        wait_count++;   
     }
     
     if (!ipc::IPCCore::getInstance().isReady()) {

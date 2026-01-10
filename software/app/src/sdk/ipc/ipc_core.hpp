@@ -33,6 +33,9 @@
 #include <zephyr/sys/ring_buffer.h>
 #include <stdint.h>
 
+
+#define DEFAULT_WAIT_IPC_READY_MS 5000
+
 namespace smarthome { namespace ipc {
 
 /*=============================================================================

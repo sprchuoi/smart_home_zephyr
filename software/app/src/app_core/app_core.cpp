@@ -136,7 +136,6 @@ static int init_ipc(void) {
 	ipc.registerCallback(smarthome::ipc::MessageType::BLE_CONNECT, handle_ble_event);
 	ipc.registerCallback(smarthome::ipc::MessageType::BLE_DISCONNECT, handle_ble_event);
 	ipc.registerCallback(smarthome::ipc::MessageType::RADIO_RX, handle_radio_event);
-	
 	LOG_INF("IPC initialized successfully");
 	
 	/* Send initial status request to NET core */
@@ -205,7 +204,7 @@ static int app_core_init_apptask(void){
 
 static int app_core_init_gpio(void){
 	int ret;
-	/* Initialize all 4 LEDs and turn them ON to verify GPIO works */
+	/* Initialize all 4 LEDs and turn them ON to verify GPIO works */	
 	for (int i = 0; i < NUM_LEDS; i++) {
 		if (!device_is_ready(leds[i].port)) {
 			LOG_ERR("LED%d device not ready", i);

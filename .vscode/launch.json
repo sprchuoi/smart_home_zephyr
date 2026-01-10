@@ -139,6 +139,13 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "type": "nrf-connect",
+            "request": "launch",
+            "name": "Launch app/build_net",
+            "config": "${workspaceFolder}/software/app/build_net",
+            "runToEntryPoint": "main"
         }
     ]
 }

@@ -95,7 +95,7 @@ int IPCCore::init() {
     k_thread_name_set(&m_rx_thread, "ipc_rx");
     
     /* Wait for endpoint to be bound (with timeout) */
-    ret = k_sem_take(&m_ready_sem, K_MSEC(5000));
+    ret = k_sem_take(&m_ready_sem, K_MSEC(DEFAULT_WAIT_IPC_READY_MS));
     if (ret < 0) {
         LOG_ERR("Timeout waiting for endpoint binding");
         return -ETIMEDOUT;

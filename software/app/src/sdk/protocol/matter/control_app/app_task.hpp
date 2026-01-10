@@ -24,6 +24,8 @@
 #include "../light_endpoint/light_endpoint.hpp"
 #include "../commission/chip_config.hpp"
 #include "../commission/commissioning_delegate.hpp"
+
+#define DEFAULT_WAIT_IPC_READY_MS 5000
 namespace smarthome { namespace protocol { namespace matter {
 
 /**

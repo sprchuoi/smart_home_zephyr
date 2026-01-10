@@ -6,75 +6,59 @@
  * Matter Smart Light with Thread networking - 4 LED control
  */
 
-&pinctrl {
-	i2c0_default: i2c0_default {
-		group1 {
-			psels = <NRF_PSEL(TWIM_SDA, 0, 26)>,
-				<NRF_PSEL(TWIM_SCL, 0, 27)>;
-		};
-	};
+/* 
+ * APP Core Device Tree Overlay for nRF5340 DK
+ */
 
-	i2c0_sleep: i2c0_sleep {
-		group1 {
-			psels = <NRF_PSEL(TWIM_SDA, 0, 26)>,
-				<NRF_PSEL(TWIM_SCL, 0, 27)>;
-			low-power-enable;
-		};
-	};
+&pinctrl {
+    i2c0_default: i2c0_default {
+        group1 {
+            psels = <NRF_PSEL(TWIM_SDA, 0, 26)>,
+                    <NRF_PSEL(TWIM_SCL, 0, 27)>;
+        };
+    };
+
+    i2c0_sleep: i2c0_sleep {
+        group1 {
+            psels = <NRF_PSEL(TWIM_SDA, 0, 26)>,
+                    <NRF_PSEL(TWIM_SCL, 0, 27)>;
+            low-power-enable;
+        };
+    };
 };
 
 / {
-	/* Aliases for Matter application - all 4 LEDs on DK */
-	aliases {
-		led0 = &led0;  /* P0.28 - Green */
-		led1 = &led1;  /* P0.29 - Green */
-		led2 = &led2;  /* P0.30 - Green */
-		led3 = &led3;  /* P0.31 - Green */
-		sw0 = &button0;
-		sw1 = &button1;
-		sw2 = &button2;
-		sw3 = &button3;
-	};
-	
-	chosen {
-		zephyr,console = &uart0;
-		zephyr,shell-uart = &uart0;
-		zephyr,ipc = &ipc0;
-		zephyr,ipc-shm = &sram0_shared;
-	};
+    aliases {
+        led0 = &led0;
+        led1 = &led1;
+        led2 = &led2;
+        led3 = &led3;
+        sw0 = &button0;
+        sw1 = &button1;
+        sw2 = &button2;
+        sw3 = &button3;
+    };
+
+    chosen {
+        zephyr,console = &uart0;
+        zephyr,shell-uart = &uart0;
+    };
+
 };
 
-/* Shared memory region for IPC */
-&sram0_shared {
-	reg = <0x20070000 0x10000>;
-};
-
-/* Configure UART for logging */
 &uart0 {
-	status = "okay";
-	current-speed = <115200>;
+    status = "okay";
+    current-speed = <115200>;
 };
 
-/* SPI for future use (sensor/storage) - disabled until pinctrl configured */
-&spi0 {
-	status = "disabled";
-};
-
-/* I2C for sensors */
 &i2c0 {
-	compatible = "nordic,nrf-twim";
-	status = "okay";
-	pinctrl-0 = <&i2c0_default>;
-	pinctrl-1 = <&i2c0_sleep>;
-	pinctrl-names = "default", "sleep";
+    compatible = "nordic,nrf-twim";
+    status = "okay";
+    pinctrl-0 = <&i2c0_default>;
+    pinctrl-1 = <&i2c0_sleep>;
+    pinctrl-names = "default", "sleep";
 };
 
-/* IPC mailbox for inter-core communication */
-&ipc0 {
-	status = "okay";
-};
-
-/* MBOX for IPC service */
 &mbox {
-	status = "okay";
+    status = "okay";
 };
