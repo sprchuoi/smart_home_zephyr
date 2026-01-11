@@ -10,6 +10,8 @@
  * APP Core Device Tree Overlay for nRF5340 DK
  */
 
+/* APP Core Device Tree Overlay for nRF5340 DK */
+
 &pinctrl {
     i2c0_default: i2c0_default {
         group1 {
@@ -27,7 +29,7 @@
     };
 };
 
-/ {
+ / {
     aliases {
         led0 = &led0;
         led1 = &led1;
@@ -42,8 +44,14 @@
     chosen {
         zephyr,console = &uart0;
         zephyr,shell-uart = &uart0;
+        zephyr,ipc-shm = &sram0_shared;
     };
+};
 
+/* Shared memory for OpenAMP */
+&sram0_shared {
+    compatible = "shared-dma-pool";
+    reg = <0x20070000 0x10000>; /* 64 KB */
 };
 
 &uart0 {
@@ -57,8 +65,4 @@
     pinctrl-0 = <&i2c0_default>;
     pinctrl-1 = <&i2c0_sleep>;
     pinctrl-names = "default", "sleep";
-};
-
-&mbox {
-    status = "okay";
 };

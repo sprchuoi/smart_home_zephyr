@@ -50,60 +50,55 @@ IPCCore::IPCCore()
  * Initialization
  *===========================================================================*/
 
-int IPCCore::init() {
+int IPCCore::init()
+{
     if (m_ready) {
         LOG_WRN("IPC already initialized");
         return 0;
     }
-    
-    LOG_INF("Initializing IPC service...");
-    
-    /* Get IPC service device */
-    const struct device *ipc_instance = DEVICE_DT_GET(DT_NODELABEL(ipc0));
-    if (!device_is_ready(ipc_instance)) {
-        LOG_ERR("IPC device not ready");
-        return -ENODEV;
-    }
-    
-    /* Configure endpoint */
+
+    LOG_INF("Initializing IPC service (OpenAMP)...");
+
     m_endpoint_cfg.name = "ipc_core";
     m_endpoint_cfg.cb = {
-        .bound = onEndpointBound,
+        .bound    = onEndpointBound,
         .received = onMessageReceived,
-        .error = onError
+        .error    = onError,
     };
     m_endpoint_cfg.priv = this;
-    
-    /* Open endpoint */
-    int ret = ipc_service_open_instance(ipc_instance);
+
+    /* Open OpenAMP instance (NO device) */
+    int ret = ipc_service_open_instance(NULL);
     if (ret < 0 && ret != -EALREADY) {
         LOG_ERR("Failed to open IPC instance: %d", ret);
         return ret;
     }
-    
-    /* Register endpoint */
-    ret = ipc_service_register_endpoint(ipc_instance, &m_endpoint, &m_endpoint_cfg);
+
+    /* Register endpoint (instance = NULL for OpenAMP) */
+    ret = ipc_service_register_endpoint(NULL, &m_endpoint, &m_endpoint_cfg);
     if (ret < 0) {
         LOG_ERR("Failed to register endpoint: %d", ret);
         return ret;
     }
-    
-    /* Start RX thread */
-    k_thread_create(&m_rx_thread, m_rx_stack, K_KERNEL_STACK_SIZEOF(m_rx_stack),
+
+    k_thread_create(&m_rx_thread, m_rx_stack,
+                    K_KERNEL_STACK_SIZEOF(m_rx_stack),
                     rxThreadEntry, this, NULL, NULL,
                     K_PRIO_COOP(7), 0, K_NO_WAIT);
     k_thread_name_set(&m_rx_thread, "ipc_rx");
-    
-    /* Wait for endpoint to be bound (with timeout) */
+
     ret = k_sem_take(&m_ready_sem, K_MSEC(DEFAULT_WAIT_IPC_READY_MS));
     if (ret < 0) {
         LOG_ERR("Timeout waiting for endpoint binding");
         return -ETIMEDOUT;
     }
-    
-    LOG_INF("IPC initialized successfully");
+
+    m_ready = true;
+    LOG_INF("IPC initialized successfully (OpenAMP)");
     return 0;
 }
+
+
 
 /*=============================================================================
  * Send Operations

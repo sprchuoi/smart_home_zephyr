@@ -6,7 +6,11 @@
 / {
     chosen {
         zephyr,ieee802154 = &ieee802154;
+        zephyr,ipc-shm = &sram0_shared;
     };
-
 };
 
+&sram0_shared {
+    compatible = "shared-dma-pool";
+    reg = <0x20070000 0x10000>; /* 64 KB */
+};
